@@ -140,6 +140,61 @@ with col2:
 with col3:
     st.markdown("### 📊 Статистика")
 
+    # Статистика видео
+    if os.path.exists(video_file_path):
+        try:
+            from utils.video_processor import get_video_info
+            video_info = get_video_info(video_file_path)
+            
+            # Форматирование битрейта
+            bitrate_mbps = video_info.get('bitrate', 0) / 1_000_000
+            bitrate_str = f"{bitrate_mbps:.2f} Mbps" if bitrate_mbps > 0 else "N/A"
+            
+            st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='stat-label'>📹 Информация о видео</div>
+                    <div style='margin-top: 0.75rem;'>
+                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
+                            <strong>Разрешение:</strong> 
+                            <span style='float: right; color: #212529;'>{video_info.get('width', 0)} × {video_info.get('height', 0)}</span>
+                        </div>
+                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
+                            <strong>FPS:</strong> 
+                            <span style='float: right; color: #212529;'>{video_info.get('fps', 0):.2f}</span>
+                        </div>
+                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
+                            <strong>Длительность:</strong> 
+                            <span style='float: right; color: #212529;'>{video_info.get('duration', 0)} сек</span>
+                        </div>
+                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
+                            <strong>Кадров:</strong> 
+                            <span style='float: right; color: #212529;'>{video_info.get('frame_count', 0)}</span>
+                        </div>
+                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
+                            <strong>Битрейт:</strong> 
+                            <span style='float: right; color: #212529;'>{bitrate_str}</span>
+                        </div>
+                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
+                            <strong>Контейнер:</strong> 
+                            <span style='float: right; color: #212529;'>{video_info.get('container', 'N/A')}</span>
+                        </div>
+                        <div style='color: #6c757d; font-size: 0.875rem;'>
+                            <strong>Кодек:</strong> 
+                            <span style='float: right; color: #212529;'>{video_info.get('codec', 'N/A')}</span>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        except Exception as e:
+            st.markdown("""
+                <div class='metric-card'>
+                    <div class='stat-label'>📹 Информация о видео</div>
+                    <div style='color: #dc3545; font-size: 0.875rem; margin-top: 0.5rem;'>
+                        Не удалось загрузить статистику
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
     # Şiramin
     st.markdown("""
         <div class='metric-card'>
