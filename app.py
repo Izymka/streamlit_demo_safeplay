@@ -99,7 +99,7 @@ with col2:
     st.markdown("### People Detection")
 
     # Путь к видео
-    video_file_path = "assets/basketball_000.mp4"
+    video_file_path = "data/raw/basketball_000.mp4"
 
     # Попытка получить длительность видео (без падения, если нет OpenCV)
     if os.path.exists(video_file_path):

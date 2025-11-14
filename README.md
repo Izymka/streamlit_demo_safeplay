@@ -28,7 +28,7 @@ my-streamlit-app/
 │   └── helpers.py
 │
 ├── assets/                   # Статические файлы
-│   ├── images/
+│   ├── yolo_det/
 │   ├── styles.css           # Кастомные стили
 │   └── logo.png
 │
