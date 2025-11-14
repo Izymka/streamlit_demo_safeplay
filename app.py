@@ -64,32 +64,32 @@ col1, col2, col3 = st.columns([1, 3, 1.2])
 with col1:
     st.markdown("### Возможности")
 
-    st.markdown("---")
+    st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
     st.markdown("**Bounding Boxes**")
     bounding_boxes = st.checkbox("Enable Bounding Boxes", value=True)
 
-    st.markdown("---")
+    st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
     track_id = st.checkbox("Track ID ID", value=False)
 
-    st.markdown("---")
+    st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
     st.markdown("**ROI Zone**")
 
-    st.markdown("---")
+    st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
     shoe_classification_1 = st.checkbox("Shoe Classification", value=True, key="shoe1")
 
-    st.markdown("---")
+    st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
     shoe_classification_2 = st.checkbox("Shoe Classification", value=True, key="shoe2")
 
-    st.markdown("---")
+    st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
     shoe_instecation = st.checkbox("Shoe Instecation", value=True)
 
-    st.markdown("---")
+    st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
     st.markdown("**Shoe Trv type Confidence Score:**")
     confidence_score = st.slider("", 0, 100, 50, label_visibility="collapsed")
@@ -145,43 +145,49 @@ with col3:
         try:
             from utils.video_processor import get_video_info
             video_info = get_video_info(video_file_path)
-            
-            # Форматирование битрейта
-            bitrate_mbps = video_info.get('bitrate', 0) / 1_000_000
-            bitrate_str = f"{bitrate_mbps:.2f} Mbps" if bitrate_mbps > 0 else "N/A"
-            
+
+            # Готовим безопасные значения
+            width = int(video_info.get('width') or 0)
+            height = int(video_info.get('height') or 0)
+            fps = float(video_info.get('fps') or 0)
+            duration_sec = int(video_info.get('duration') or 0)
+            frames = int(video_info.get('frame_count') or 0)
+
+            # Форматирование
+            fps_str = f"{fps:.2f}" if fps > 0 else "—"
+            dur_str = f"{duration_sec} сек" if duration_sec > 0 else "—"
+            res_str = f"{width} × {height}" if width > 0 and height > 0 else "—"
+            frames_str = f"{frames}" if frames > 0 else "—"
+
+            # Динамически собираем HTML, скрывая отсутствующие поля
+            rows = []
+            rows.append(f"""
+                <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
+                    <strong>Разрешение:</strong>
+                    <span style='float: right; color: #212529;'>{res_str}</span>
+                </div>""")
+            rows.append(f"""
+                <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
+                    <strong>FPS:</strong>
+                    <span style='float: right; color: #212529;'>{fps_str}</span>
+                </div>""")
+            rows.append(f"""
+                <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
+                    <strong>Длительность:</strong>
+                    <span style='float: right; color: #212529;'>{dur_str}</span>
+                </div>""")
+            rows.append(f"""
+                <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
+                    <strong>Кадров:</strong>
+                    <span style='float: right; color: #212529;'>{frames_str}</span>
+                </div>""")
+
+            html = "\n".join(rows)
             st.markdown(f"""
                 <div class='metric-card'>
                     <div class='stat-label'>📹 Информация о видео</div>
                     <div style='margin-top: 0.75rem;'>
-                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
-                            <strong>Разрешение:</strong> 
-                            <span style='float: right; color: #212529;'>{video_info.get('width', 0)} × {video_info.get('height', 0)}</span>
-                        </div>
-                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
-                            <strong>FPS:</strong> 
-                            <span style='float: right; color: #212529;'>{video_info.get('fps', 0):.2f}</span>
-                        </div>
-                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
-                            <strong>Длительность:</strong> 
-                            <span style='float: right; color: #212529;'>{video_info.get('duration', 0)} сек</span>
-                        </div>
-                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
-                            <strong>Кадров:</strong> 
-                            <span style='float: right; color: #212529;'>{video_info.get('frame_count', 0)}</span>
-                        </div>
-                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
-                            <strong>Битрейт:</strong> 
-                            <span style='float: right; color: #212529;'>{bitrate_str}</span>
-                        </div>
-                        <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
-                            <strong>Контейнер:</strong> 
-                            <span style='float: right; color: #212529;'>{video_info.get('container', 'N/A')}</span>
-                        </div>
-                        <div style='color: #6c757d; font-size: 0.875rem;'>
-                            <strong>Кодек:</strong> 
-                            <span style='float: right; color: #212529;'>{video_info.get('codec', 'N/A')}</span>
-                        </div>
+                        {html}
                     </div>
                 </div>
             """, unsafe_allow_html=True)
