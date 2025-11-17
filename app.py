@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import os
+import tempfile
 from datetime import datetime
 
 # utils
@@ -11,7 +12,9 @@ from utils.yolo_utils import (
     compute_avg_detections,
     read_frame,
     draw_bboxes_on_image,
+    create_video_with_detections,
 )
+
 
 # Защитная обертка для получения инфо о видео без жесткой зависимости от cv2
 def _is_cv2_usable():
@@ -40,13 +43,18 @@ def get_video_info_safe(path: str) -> dict:
     except Exception:
         return {}
 
-# Инициализация состояния приложения (безопасно по умолчанию)
+
+# Инициализация состояния приложения
 if 'is_playing' not in st.session_state:
     st.session_state.is_playing = False
 if 'current_frame' not in st.session_state:
     st.session_state.current_frame = 0
 if 'video_duration' not in st.session_state:
     st.session_state.video_duration = 0
+if 'min_confidence' not in st.session_state:
+    st.session_state.min_confidence = 0.0
+if 'video_mode' not in st.session_state:
+    st.session_state.video_mode = False
 
 # Настройка страницы
 st.set_page_config(
@@ -105,11 +113,27 @@ with col1:
     st.markdown("**Детекции YOLO**")
     yolo_enabled = st.checkbox("Показывать детекции YOLO", value=True)
 
-    st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
+    # Фильтр по уверенности
+    if yolo_enabled:
+        st.markdown("**Фильтр уверенности**")
+        st.session_state.min_confidence = st.slider(
+            "Минимальная уверенность",
+            min_value=0.0,
+            max_value=1.0,
+            value=st.session_state.min_confidence,
+            step=0.05,
+            format="%.2f"
+        )
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
-    track_id = st.checkbox("Track ID ID", value=False)
+    # Режим видео
+    st.markdown("**Режим воспроизведения**")
+    st.session_state.video_mode = st.checkbox("Режим видео", value=st.session_state.video_mode)
+
+    st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
+
+    track_id = st.checkbox("Track ID", value=False)
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
@@ -167,46 +191,150 @@ with col2:
         except Exception:
             frames = len(det_data.get("results", []))
 
-    # Селектор кадра (если есть хотя бы 1 кадр)
-    max_frame_idx = max(0, (frames - 1) if frames else 0)
-    st.session_state.current_frame = st.slider(
-        "Кадр",
-        min_value=0,
-        max_value=max_frame_idx,
-        value=int(st.session_state.get("current_frame", 0)),
-        step=1,
-    )
+    # Кнопки навигации и управления
+    control_cols = st.columns([2, 1.5, 1.5, 1.5, 1.5, 4])
+
+    with control_cols[0]:
+        if st.button("⏮️ Начало"):
+            st.session_state.current_frame = 0
+            st.rerun()
+
+    with control_cols[1]:
+        if st.button("◀️ -10"):
+            st.session_state.current_frame = max(0, st.session_state.current_frame - 10)
+            st.rerun()
+
+    with control_cols[2]:
+        if st.button("◀️ -1"):
+            st.session_state.current_frame = max(0, st.session_state.current_frame - 1)
+            st.rerun()
+
+    with control_cols[3]:
+        if st.button("▶️ +1"):
+            max_frame_idx = max(0, (frames - 1) if frames else 0)
+            st.session_state.current_frame = min(max_frame_idx, st.session_state.current_frame + 1)
+            st.rerun()
+
+    with control_cols[4]:
+        if st.button("⏭️ +10"):
+            max_frame_idx = max(0, (frames - 1) if frames else 0)
+            st.session_state.current_frame = min(max_frame_idx, st.session_state.current_frame + 10)
+            st.rerun()
+
+    # Селектор кадра (если не в режиме видео)
+    if not st.session_state.video_mode:
+        max_frame_idx = max(0, (frames - 1) if frames else 0)
+        st.session_state.current_frame = st.slider(
+            "Кадр",
+            min_value=0,
+            max_value=max_frame_idx,
+            value=int(st.session_state.get("current_frame", 0)),
+            step=1,
+        )
 
     # Отрисовка
     if os.path.exists(video_file_path):
-        # Всегда читаем конкретный кадр по индексу слайдера
-        frame_idx = st.session_state.current_frame
-        bgr = read_frame(video_file_path, frame_idx)
+        if st.session_state.video_mode:
+            # Режим видео с детекциями
+            st.markdown("#### 🎬 Режим видео")
 
-        if bgr is not None:
-            if 'yolo_enabled' in locals() and yolo_enabled:
-                # читаем детекции и рисуем боксы
-                dets = get_frame_detections(det_data, frame_idx)
-                bgr_drawn = draw_bboxes_on_image(bgr, dets)
-                rgb = bgr_drawn[:, :, ::-1]
-                caption = f"Кадр {frame_idx} — детекций: {len(dets)}"
-            else:
-                # показываем «чистый» кадр без детекций
-                rgb = bgr[:, :, ::-1]
-                caption = f"Кадр {frame_idx}"
+            if yolo_enabled:
+                # Кнопка для создания видео с детекциями
+                if st.button("🎥 Создать видео с детекциями"):
+                    with st.spinner("Создание видео... Это может занять некоторое время."):
+                        # Создаем временный файл
+                        temp_output = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+                        output_path = temp_output.name
+                        temp_output.close()
 
-            st.image(rgb, caption=caption, use_container_width=True)
-        else:
-            # Фолбэк, если кадр не удалось прочитать
-            st.info("Не удалось прочитать кадр для отображения. Показываем видео.")
+                        # Progress bar
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+
+
+                        def progress_callback(frame_idx, total_frames):
+                            if total_frames > 0:
+                                progress = frame_idx / total_frames
+                                progress_bar.progress(progress)
+                                status_text.text(f"Обработка кадра {frame_idx}/{total_frames}")
+
+
+                        # Создаем видео
+                        success = create_video_with_detections(
+                            video_file_path,
+                            det_data,
+                            output_path,
+                            min_confidence=st.session_state.min_confidence if yolo_enabled else None,
+                            progress_callback=progress_callback
+                        )
+
+                        if success:
+                            st.success("✅ Видео успешно создано!")
+                            # Показываем видео
+                            with open(output_path, "rb") as vf:
+                                st.video(vf.read())
+
+                            # Кнопка для скачивания
+                            with open(output_path, "rb") as vf:
+                                st.download_button(
+                                    label="📥 Скачать видео",
+                                    data=vf.read(),
+                                    file_name=f"detections_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
+                                    mime="video/mp4"
+                                )
+
+                            # Удаляем временный файл
+                            try:
+                                os.unlink(output_path)
+                            except:
+                                pass
+                        else:
+                            st.error("❌ Ошибка при создании видео")
+
+                        progress_bar.empty()
+                        status_text.empty()
+
+            # Показываем оригинальное видео
+            st.markdown("**Исходное видео:**")
             with open(video_file_path, "rb") as vf:
                 st.video(vf.read())
+
+        else:
+            # Режим покадрового просмотра
+            frame_idx = st.session_state.current_frame
+            bgr = read_frame(video_file_path, frame_idx)
+
+            if bgr is not None:
+                if yolo_enabled:
+                    # читаем детекции с учетом фильтра уверенности и рисуем боксы
+                    dets = get_frame_detections(
+                        det_data,
+                        frame_idx,
+                        min_confidence=st.session_state.min_confidence
+                    )
+                    bgr_drawn = draw_bboxes_on_image(bgr, dets)
+                    rgb = bgr_drawn[:, :, ::-1]
+                    caption = f"Кадр {frame_idx} — детекций: {len(dets)} (conf ≥ {st.session_state.min_confidence:.2f})"
+                else:
+                    # показываем «чистый» кадр без детекций
+                    rgb = bgr[:, :, ::-1]
+                    caption = f"Кадр {frame_idx}"
+
+                st.image(rgb, caption=caption, use_container_width=True)
+            else:
+                st.warning("⚠️ Не удалось прочитать кадр")
 
         # Показать длительность, если смогли вычислить
         if st.session_state.video_duration:
             mins = st.session_state.video_duration // 60
             secs = st.session_state.video_duration % 60
-            st.caption(f"Длительность: {mins}:{secs:02d}")
+
+            st.markdown(
+                f"<p style='text-align: center; color: gray; font-size: 0.9em;'>"
+                f"Длительность: {mins}:{secs:02d}"
+                f"</p>",
+                unsafe_allow_html=True
+            )
     else:
         # Заглушка, если видео не найдено
         st.markdown(
@@ -221,6 +349,7 @@ with col2:
             """,
             unsafe_allow_html=True,
         )
+
 # Правая панель - Статистика
 with col3:
     st.markdown("### 📊 Статистика")
@@ -233,18 +362,21 @@ with col3:
             # Готовим безопасные значения
             width = int(video_info.get('width') or 0)
             height = int(video_info.get('height') or 0)
-            fps = float(video_info.get('fps') or 0)
+            fps_val = float(video_info.get('fps') or 0)
             duration_sec = int(video_info.get('duration') or 0)
             frames_stat = int(video_info.get('frame_count') or 0)
 
-            # Среднее число детекций на кадр из JSON
+            # Среднее число детекций на кадр из JSON с учетом фильтра
             try:
-                avg_det = compute_avg_detections(det_data) if 'det_data' in locals() else 0.0
+                avg_det = compute_avg_detections(
+                    det_data,
+                    min_confidence=st.session_state.min_confidence if yolo_enabled else None
+                ) if 'det_data' in locals() else 0.0
             except Exception:
                 avg_det = 0.0
 
             # Форматирование
-            fps_str = f"{fps:.2f}" if fps > 0 else "—"
+            fps_str = f"{fps_val:.2f}" if fps_val > 0 else "—"
             dur_str = f"{duration_sec} сек" if duration_sec > 0 else "—"
             res_str = f"{width} × {height}" if width > 0 and height > 0 else "—"
             frames_str = f"{frames_stat}" if frames_stat > 0 else "—"
@@ -297,13 +429,20 @@ with col3:
                 </div>
             """, unsafe_allow_html=True)
 
-    # Детекции YOLO (вместо "Şiramin")
+    # Детекции YOLO на текущем кадре
     try:
         cur_f = int(st.session_state.get('current_frame', 0))
-        cur_dets = get_frame_detections(det_data, cur_f) if 'det_data' in locals() else []
+        cur_dets = get_frame_detections(
+            det_data,
+            cur_f,
+            min_confidence=st.session_state.min_confidence if yolo_enabled else None
+        ) if 'det_data' in locals() else []
+
+        conf_info = f" (conf ≥ {st.session_state.min_confidence:.2f})" if yolo_enabled and st.session_state.min_confidence > 0 else ""
+
         st.markdown(f"""
             <div class='metric-card'>
-                <div class='stat-label'>Детекции YOLO</div>
+                <div class='stat-label'>Детекции YOLO{conf_info}</div>
                 <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.5rem;'>
                     <div style='margin-bottom: 0.25rem;'>Кадр: <span style='float: right; color: #212529;'>{cur_f}</span></div>
                     <div>Количество детекций: <span style='float: right; color: #212529;'>{len(cur_dets)}</span></div>
@@ -378,13 +517,3 @@ with col3:
                 <div class='stat-value' style='color: #28a745;'>94%</div>
             </div>
         """, unsafe_allow_html=True)
-
-# Кнопка паузы в правом верхнем углу
-st.markdown("""
-    <div style='position: fixed; top: 1rem; right: 1rem; z-index: 999;'>
-        <button style='background-color: white; border: 1px solid #dee2e6; border-radius: 50%; 
-        width: 40px; height: 40px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
-            ⏸️
-        </button>
-    </div>
-""", unsafe_allow_html=True)

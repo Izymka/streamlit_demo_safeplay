@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 
 import numpy as np
 
@@ -9,7 +9,7 @@ def load_detections(json_path: str) -> Dict[str, Any]:
     """Load YOLO detections JSON.
 
     Expected schema contains keys: video_info, detection_info, results (list per frame).
-    Returns the parsed dictionary. If file is missing or invalid, returns an empty structure.
+    Returns the parsed dictionary.
     """
     if not os.path.exists(json_path):
         return {"video_info": {}, "detection_info": {}, "results": []}
@@ -24,29 +24,69 @@ def load_detections(json_path: str) -> Dict[str, Any]:
         return {"video_info": {}, "detection_info": {}, "results": []}
 
 
-def get_frame_detections(data: Dict[str, Any], frame_idx: int) -> List[Dict[str, Any]]:
+def get_frame_detections(
+        data: Dict[str, Any],
+        frame_idx: int,
+        min_confidence: Optional[float] = None
+) -> List[Dict[str, Any]]:
     """Return detections list for a specific frame index.
-    If not found, returns empty list.
+
+    Args:
+        data: Detection data dictionary
+        frame_idx: Frame index
+        min_confidence: Minimum confidence threshold (0.0-1.0). If None, no filtering.
+
+    Returns:
+        List of detections for the frame
     """
     results = data.get("results", [])
+    detections = []
+
     # Many exporters save frames in order; we can index directly if frames are contiguous
     if 0 <= frame_idx < len(results):
         res = results[frame_idx]
         # ensure the frame number matches; fallback to search if mismatch
         if isinstance(res, dict) and res.get("frame") == frame_idx:
-            return res.get("detections", []) or []
-    # fallback: search by frame field
-    for item in results:
-        try:
-            if int(item.get("frame")) == int(frame_idx):
-                return item.get("detections", []) or []
-        except Exception:
-            continue
-    return []
+            detections = res.get("detections", []) or []
+        else:
+            # fallback: search by frame field
+            for item in results:
+                try:
+                    if int(item.get("frame")) == int(frame_idx):
+                        detections = item.get("detections", []) or []
+                        break
+                except Exception:
+                    continue
+    else:
+        # fallback: search by frame field
+        for item in results:
+            try:
+                if int(item.get("frame")) == int(frame_idx):
+                    detections = item.get("detections", []) or []
+                    break
+            except Exception:
+                continue
+
+    # Apply confidence filtering if specified
+    if min_confidence is not None and detections:
+        detections = [
+            det for det in detections
+            if det.get("confidence", 0.0) >= min_confidence
+        ]
+
+    return detections
 
 
-def compute_avg_detections(data: Dict[str, Any]) -> float:
-    """Compute average number of detections per frame from JSON."""
+def compute_avg_detections(data: Dict[str, Any], min_confidence: Optional[float] = None) -> float:
+    """Compute average number of detections per frame from JSON.
+
+    Args:
+        data: Detection data dictionary
+        min_confidence: Minimum confidence threshold for filtering
+
+    Returns:
+        Average detections per frame
+    """
     results = data.get("results", [])
     if not results:
         return 0.0
@@ -56,6 +96,9 @@ def compute_avg_detections(data: Dict[str, Any]) -> float:
         if isinstance(item, dict):
             dets = item.get("detections", [])
             if isinstance(dets, list):
+                # Apply confidence filter if specified
+                if min_confidence is not None:
+                    dets = [d for d in dets if d.get("confidence", 0.0) >= min_confidence]
                 total += len(dets)
                 count += 1
     if count == 0:
@@ -69,15 +112,15 @@ def muted_color_palette(n: int) -> List[Tuple[int, int, int]]:
     """
     base = [
         (108, 117, 125),  # gray-ish
-        (52, 152, 219),   # muted blue
-        (46, 204, 113),   # muted green
-        (241, 196, 15),   # muted yellow
-        (231, 76, 60),    # muted red
-        (155, 89, 182),   # muted purple
-        (26, 188, 156),   # muted teal
-        (243, 156, 18),   # orange
+        (52, 152, 219),  # muted blue
+        (46, 204, 113),  # muted green
+        (241, 196, 15),  # muted yellow
+        (231, 76, 60),  # muted red
+        (155, 89, 182),  # muted purple
+        (26, 188, 156),  # muted teal
+        (243, 156, 18),  # orange
         (149, 165, 166),  # concrete
-        (52, 73, 94),     # wet asphalt
+        (52, 73, 94),  # wet asphalt
     ]
     if n <= len(base):
         return base[:n]
@@ -175,7 +218,7 @@ def draw_bboxes_on_image(image_bgr: np.ndarray, detections: List[Dict[str, Any]]
         # label
         cls_name = str(det.get("class", "obj"))
         conf = det.get("confidence", None)
-        label = f"{cls_name}" if conf is None else f"{cls_name} {conf:.2f}"
+        label = f"{cls_name}" if conf is None else f"conf: {conf:.2f}"
         # background for text
         (tw, th), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
         th = th + baseline
@@ -189,3 +232,77 @@ def draw_bboxes_on_image(image_bgr: np.ndarray, detections: List[Dict[str, Any]]
         cv2.putText(out, label, (x1 + 3, y1 + th), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (20, 20, 20), 1, cv2.LINE_AA)
 
     return out
+
+
+def create_video_with_detections(
+        video_path: str,
+        det_data: Dict[str, Any],
+        output_path: str,
+        min_confidence: Optional[float] = None,
+        progress_callback=None
+) -> bool:
+    """Create a video with detections drawn on each frame.
+
+    Args:
+        video_path: Path to input video
+        det_data: Detection data dictionary
+        output_path: Path to save output video
+        min_confidence: Minimum confidence threshold
+        progress_callback: Optional callback function for progress updates (receives frame_idx, total_frames)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        import cv2
+    except Exception:
+        return False
+
+    if not os.path.exists(video_path):
+        return False
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return False
+
+    try:
+        # Get video properties
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        # Create video writer
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+        frame_idx = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # Get detections for current frame
+            dets = get_frame_detections(det_data, frame_idx, min_confidence)
+
+            # Draw detections
+            frame_with_dets = draw_bboxes_on_image(frame, dets)
+
+            # Write frame
+            out.write(frame_with_dets)
+
+            # Progress callback
+            if progress_callback:
+                progress_callback(frame_idx, total_frames)
+
+            frame_idx += 1
+
+        return True
+
+    except Exception:
+        return False
+
+    finally:
+        cap.release()
+        if 'out' in locals():
+            out.release()
