@@ -14,6 +14,12 @@ from utils.yolo_utils import (
     draw_bboxes_on_image,
     create_video_with_detections,
 )
+from utils.track_utils import (
+    load_mot_tracks,
+    get_frame_tracks,
+    draw_tracks_on_image,
+    create_video_with_tracks,
+)
 
 
 # Защитная обертка для получения инфо о видео без жесткой зависимости от cv2
@@ -44,6 +50,24 @@ def get_video_info_safe(path: str) -> dict:
         return {}
 
 
+def handle_video_mode_change():
+    """Обработчик изменения режима видео"""
+    if st.session_state.video_mode:
+        # Если включили режим видео - снимаем все остальные галочки
+        st.session_state.yolo_enabled = False
+        st.session_state.track_id = False
+        st.session_state.shoe1 = False
+        st.session_state.shoe2 = False
+        st.session_state.shoe_instecation = False
+
+
+def handle_other_checkboxes_change():
+    """Обработчик изменения других чекбоксов"""
+    # Если любой другой чекбокс изменился и режим видео был включен - выключаем его
+    if st.session_state.video_mode:
+        st.session_state.video_mode = False
+
+
 # Инициализация состояния приложения
 if 'is_playing' not in st.session_state:
     st.session_state.is_playing = False
@@ -55,6 +79,17 @@ if 'min_confidence' not in st.session_state:
     st.session_state.min_confidence = 0.0
 if 'video_mode' not in st.session_state:
     st.session_state.video_mode = False
+# Инициализация состояний для чекбоксов
+if 'yolo_enabled' not in st.session_state:
+    st.session_state.yolo_enabled = True
+if 'track_id' not in st.session_state:
+    st.session_state.track_id = False
+if 'shoe1' not in st.session_state:
+    st.session_state.shoe1 = True
+if 'shoe2' not in st.session_state:
+    st.session_state.shoe2 = True
+if 'shoe_instecation' not in st.session_state:
+    st.session_state.shoe_instecation = True
 
 # Настройка страницы
 st.set_page_config(
@@ -111,7 +146,12 @@ with col1:
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
     st.markdown("**Детекции YOLO**")
-    yolo_enabled = st.checkbox("Показывать детекции YOLO", value=True)
+    yolo_enabled = st.checkbox(
+        "Показывать детекции YOLO",
+        value=st.session_state.yolo_enabled,
+        key="yolo_enabled",
+        on_change=handle_other_checkboxes_change
+    )
 
     # Фильтр по уверенности
     if yolo_enabled:
@@ -127,13 +167,23 @@ with col1:
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
-    # Режим видео
-    st.markdown("**Режим воспроизведения**")
-    st.session_state.video_mode = st.checkbox("Режим видео", value=st.session_state.video_mode)
+    track_id = st.checkbox(
+        "Показывать OC SORT трекер",
+        value=st.session_state.track_id,
+        key="track_id",
+        on_change=handle_other_checkboxes_change
+    )
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
-    track_id = st.checkbox("Track ID", value=False)
+    # Режим видео
+    st.markdown("**Режим воспроизведения**")
+    video_mode = st.checkbox(
+        "Режим видео",
+        value=st.session_state.video_mode,
+        key="video_mode",
+        on_change=handle_video_mode_change
+    )
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
@@ -141,15 +191,30 @@ with col1:
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
-    shoe_classification_1 = st.checkbox("Shoe Classification", value=True, key="shoe1")
+    shoe_classification_1 = st.checkbox(
+        "Shoe Classification",
+        value=st.session_state.shoe1,
+        key="shoe1",
+        on_change=handle_other_checkboxes_change
+    )
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
-    shoe_classification_2 = st.checkbox("Shoe Classification", value=True, key="shoe2")
+    shoe_classification_2 = st.checkbox(
+        "Shoe Classification",
+        value=st.session_state.shoe2,
+        key="shoe2",
+        on_change=handle_other_checkboxes_change
+    )
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
-    shoe_instecation = st.checkbox("Shoe Instecation", value=True)
+    shoe_instecation = st.checkbox(
+        "Shoe Instecation",
+        value=st.session_state.shoe_instecation,
+        key="shoe_instecation",
+        on_change=handle_other_checkboxes_change
+    )
 
 # Центральная панель - Видео
 with col2:
@@ -158,6 +223,7 @@ with col2:
     # Пути к данным
     video_file_path = "data/raw/basketball_000.mp4"
     det_json_path = "assets/yolo_det/basketball_000.json"
+    tracks_txt_path = "assets/tracks/basketball_000.txt"
 
     # Информация о видео
     frames = 0
@@ -181,8 +247,12 @@ with col2:
     def _load_json(path):
         return load_detections(path)
 
+    @st.cache_data(show_spinner=False)
+    def _load_tracks(path):
+        return load_mot_tracks(path)
 
     det_data = _load_json(det_json_path) if os.path.exists(det_json_path) else {"results": []}
+    tracks_data = _load_tracks(tracks_txt_path) if os.path.exists(tracks_txt_path) else {"tracks": []}
 
     # Если число кадров неизвестно, попробуем взять из JSON
     if frames == 0:
@@ -222,7 +292,7 @@ with col2:
             st.rerun()
 
     # Селектор кадра (если не в режиме видео)
-    if not st.session_state.video_mode:
+    if not video_mode:
         max_frame_idx = max(0, (frames - 1) if frames else 0)
         st.session_state.current_frame = st.slider(
             "Кадр",
@@ -234,13 +304,16 @@ with col2:
 
     # Отрисовка
     if os.path.exists(video_file_path):
-        if st.session_state.video_mode:
+        if video_mode:
             # Режим видео с детекциями
             st.markdown("#### 🎬 Режим видео")
 
-            if yolo_enabled:
+            # Создаем колонки для кнопок
+            col1, col2 = st.columns(2)
+
+            with col1:
                 # Кнопка для создания видео с детекциями
-                if st.button("🎥 Создать видео с детекциями"):
+                if st.button("🎥 Создать видео с детекциями", use_container_width=True):
                     with st.spinner("Создание видео... Это может занять некоторое время."):
                         # Создаем временный файл
                         temp_output = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
@@ -264,15 +337,15 @@ with col2:
                             video_file_path,
                             det_data,
                             output_path,
-                            min_confidence=st.session_state.min_confidence if yolo_enabled else None,
+                            min_confidence=st.session_state.min_confidence,
                             progress_callback=progress_callback
                         )
 
                         if success:
                             st.success("✅ Видео успешно создано!")
                             # Показываем видео
-                            with open(output_path, "rb") as vf:
-                                st.video(vf.read())
+                            #with open(output_path, "rb") as vf:
+                            #    st.video(vf.read())
 
                             # Кнопка для скачивания
                             with open(output_path, "rb") as vf:
@@ -294,6 +367,53 @@ with col2:
                         progress_bar.empty()
                         status_text.empty()
 
+            with col2:
+                # Кнопка для создания видео с трекером (OC-SORT MOT)
+                if st.button("🎥 Создать видео с трекером", use_container_width=True):
+                    with st.spinner("Создание видео с трекером... Это может занять некоторое время."):
+                        temp_output_tr = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+                        output_path_tr = temp_output_tr.name
+                        temp_output_tr.close()
+
+                        progress_bar_tr = st.progress(0)
+                        status_text_tr = st.empty()
+
+
+                        def progress_callback_tr(frame_idx, total_frames):
+                            if total_frames > 0:
+                                progress = frame_idx / total_frames
+                                progress_bar_tr.progress(progress)
+                                status_text_tr.text(f"Обработка кадра {frame_idx}/{total_frames}")
+
+
+                        success_tr = create_video_with_tracks(
+                            video_file_path,
+                            tracks_data,
+                            output_path_tr,
+                            progress_callback=progress_callback_tr
+                        )
+
+                        if success_tr:
+                            st.success("✅ Видео с трекером успешно создано!")
+                            #with open(output_path_tr, "rb") as vf:
+                            #    st.video(vf.read())
+                            with open(output_path_tr, "rb") as vf:
+                                st.download_button(
+                                    label="📥 Скачать видео",
+                                    data=vf.read(),
+                                    file_name=f"tracks_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
+                                    mime="video/mp4"
+                                )
+                            try:
+                                os.unlink(output_path_tr)
+                            except:
+                                pass
+                        else:
+                            st.error("❌ Ошибка при создании видео с трекером")
+
+                        progress_bar_tr.empty()
+                        status_text_tr.empty()
+
             # Показываем оригинальное видео
             st.markdown("**Исходное видео:**")
             with open(video_file_path, "rb") as vf:
@@ -305,20 +425,55 @@ with col2:
             bgr = read_frame(video_file_path, frame_idx)
 
             if bgr is not None:
-                if yolo_enabled:
+                img = bgr
+                yolo_count = None
+                track_count = None
+
+                if st.session_state.yolo_enabled:
                     # читаем детекции с учетом фильтра уверенности и рисуем боксы
                     dets = get_frame_detections(
                         det_data,
                         frame_idx,
                         min_confidence=st.session_state.min_confidence
                     )
-                    bgr_drawn = draw_bboxes_on_image(bgr, dets)
-                    rgb = bgr_drawn[:, :, ::-1]
-                    caption = f"Кадр {frame_idx} — детекций: {len(dets)} (conf ≥ {st.session_state.min_confidence:.2f})"
-                else:
-                    # показываем «чистый» кадр без детекций
-                    rgb = bgr[:, :, ::-1]
-                    caption = f"Кадр {frame_idx}"
+                    yolo_count = len(dets)
+                    img = draw_bboxes_on_image(img, dets)
+
+                if st.session_state.track_id:
+                    tracks = get_frame_tracks(tracks_data, frame_idx) if 'tracks_data' in locals() else []
+                    track_count = len(tracks)
+
+                    # Build short track history window for smooth trail drawing in frame-by-frame mode
+                    history_len = 25
+                    start_f = max(0, frame_idx - history_len + 1)
+                    track_history = {}
+                    if 'tracks_data' in locals():
+                        for f in range(start_f, frame_idx + 1):
+                            f_tracks = get_frame_tracks(tracks_data, f)
+                            for tr in f_tracks:
+                                tid = tr.get("id")
+                                bbox = tr.get("bbox", {})
+                                try:
+                                    cx = int((bbox.get("x1", 0) + bbox.get("x2", 0)) / 2)
+                                    cy = int(bbox.get("y2", 0))  # bottom center
+                                except Exception:
+                                    continue
+                                if tid not in track_history:
+                                    from collections import deque
+                                    track_history[tid] = deque(maxlen=history_len)
+                                track_history[tid].append((cx, cy))
+
+                    img = draw_tracks_on_image(img, tracks, track_history)
+
+                rgb = img[:, :, ::-1]
+
+                # Build caption
+                parts = [f"Кадр {frame_idx}"]
+                if st.session_state.yolo_enabled:
+                    parts.append(f"YOLO: {yolo_count} (conf ≥ {st.session_state.min_confidence:.2f})")
+                if st.session_state.track_id:
+                    parts.append(f"Tracks: {track_count}")
+                caption = " — ".join(parts)
 
                 st.image(rgb, caption=caption, use_container_width=True)
             else:
@@ -370,10 +525,25 @@ with col3:
             try:
                 avg_det = compute_avg_detections(
                     det_data,
-                    min_confidence=st.session_state.min_confidence if yolo_enabled else None
+                    min_confidence=st.session_state.min_confidence if st.session_state.yolo_enabled else None
                 ) if 'det_data' in locals() else 0.0
             except Exception:
                 avg_det = 0.0
+
+            # Среднее число треков на кадр из MOT-треков
+            try:
+                tracks_list = tracks_data.get("tracks", []) if 'tracks_data' in locals() else []
+                if frames_stat and frames_stat > 0:
+                    total_frames_for_avg = frames_stat
+                else:
+                    try:
+                        max_frame_idx = max((int(t.get("frame", -1)) for t in tracks_list), default=-1)
+                        total_frames_for_avg = max_frame_idx + 1 if max_frame_idx >= 0 else 0
+                    except Exception:
+                        total_frames_for_avg = 0
+                avg_trk = (len(tracks_list) / total_frames_for_avg) if total_frames_for_avg > 0 else 0.0
+            except Exception:
+                avg_trk = 0.0
 
             # Форматирование
             fps_str = f"{fps_val:.2f}" if fps_val > 0 else "—"
@@ -381,6 +551,7 @@ with col3:
             res_str = f"{width} × {height}" if width > 0 and height > 0 else "—"
             frames_str = f"{frames_stat}" if frames_stat > 0 else "—"
             avg_det_str = f"{avg_det:.2f}" if avg_det > 0 else "—"
+            avg_trk_str = f"{avg_trk:.2f}" if avg_trk > 0 else "—"
 
             # Динамически собираем HTML, скрывая отсутствующие поля
             rows = []
@@ -409,6 +580,11 @@ with col3:
                     <strong>Сред. детекций/кадр:</strong>
                     <span style='float: right; color: #212529;'>{avg_det_str}</span>
                 </div>""")
+            rows.append(f"""
+                <div style='color: #6c757d; font-size: 0.875rem; margin-bottom: 0.5rem;'>
+                    <strong>Сред. треков/кадр:</strong>
+                    <span style='float: right; color: #212529;'>{avg_trk_str}</span>
+                </div>""")
 
             html = "\n".join(rows)
             st.markdown(f"""
@@ -428,23 +604,27 @@ with col3:
                     </div>
                 </div>
             """, unsafe_allow_html=True)
-
-    # Детекции YOLO на текущем кадре
     try:
         cur_f = int(st.session_state.get('current_frame', 0))
+        st.markdown(f"""
+                <div class='metric-card'>
+                    <div style='text-align: center; color: #212529; font-weight: 600; margin-bottom: 0.5rem;'>🔘 Кадр: {cur_f} </div>
+            """, unsafe_allow_html=True)
+        # Детекции YOLO на текущем кадре
+
+
         cur_dets = get_frame_detections(
             det_data,
             cur_f,
-            min_confidence=st.session_state.min_confidence if yolo_enabled else None
+            min_confidence=st.session_state.min_confidence if st.session_state.yolo_enabled else None
         ) if 'det_data' in locals() else []
 
-        conf_info = f" (conf ≥ {st.session_state.min_confidence:.2f})" if yolo_enabled and st.session_state.min_confidence > 0 else ""
+        conf_info = f" (conf ≥ {st.session_state.min_confidence:.2f})" if st.session_state.yolo_enabled and st.session_state.min_confidence > 0 else ""
 
         st.markdown(f"""
             <div class='metric-card'>
                 <div class='stat-label'>Детекции YOLO{conf_info}</div>
                 <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.5rem;'>
-                    <div style='margin-bottom: 0.25rem;'>Кадр: <span style='float: right; color: #212529;'>{cur_f}</span></div>
                     <div>Количество детекций: <span style='float: right; color: #212529;'>{len(cur_dets)}</span></div>
                 </div>
             </div>
@@ -452,27 +632,27 @@ with col3:
     except Exception:
         pass
 
-    # Duse type
-    st.markdown("""
-        <div class='metric-card'>
-            <div class='stat-label'>Duse type</div>
-            <div class='stat-value'>81,7.36.15</div>
-            <div style='margin-top: 0.5rem;'>
-                <div style='color: #6c757d; font-size: 0.75rem;'>Video: <span style='float: right;'>27,74 %</span></div>
-                <div style='color: #6c757d; font-size: 0.75rem;'>1Type: <span style='float: right;'>8.37,75</span></div>
-                <div style='color: #6c757d; font-size: 0.75rem;'>Notes: <span style='float: right;'>1,111</span></div>
-                <div style='color: #6c757d; font-size: 0.75rem;'>Kib: <span style='float: right;'>-80.19</span></div>
-                <div style='color: #6c757d; font-size: 0.75rem;'>ID: <span style='float: right;'>∗</span></div>
-                <div style='color: #6c757d; font-size: 0.75rem;'>Skl: <span style='float: right;'>1.25,50</span></div>
+    # Трекер OC SORT — количество треков на текущем кадре
+    try:
+        cur_f_tr = int(st.session_state.get('current_frame', 0))
+        cur_tracks = get_frame_tracks(tracks_data, cur_f_tr) if 'tracks_data' in locals() else []
+
+        st.markdown(f"""
+            <div class='metric-card'>
+                <div class='stat-label'>Трекер OC SORT</div>
+                <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.5rem;'>
+                    <div>Количество треков: <span style='float: right; color: #212529;'>{len(cur_tracks)}</span></div>
+                </div>
             </div>
-        </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+    except Exception:
+        pass
 
     # Note
     st.markdown("""
         <div class='metric-card'>
             <div class='stat-label'>Note:</div>
-            <div style='color: #212529; font-size: 1rem;'>80.4; 135.ikm 🔵</div>
+            <div style='color: #212529; font-size: 1rem;'>80.4; 135.ikm 🔘</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -481,12 +661,6 @@ with col3:
         <div class='metric-card'>
             <div class='stat-label' style='text-align: center; font-size: 1rem;'>Detect Id</div>
         </div>
-    """, unsafe_allow_html=True)
-
-    # График
-    st.markdown("""
-        <div class='metric-card'>
-            <div style='text-align: center; color: #212529; font-weight: 600; margin-bottom: 0.5rem;'>1DI</div>
     """, unsafe_allow_html=True)
 
     # Простая визуализация графика
