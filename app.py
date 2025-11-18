@@ -20,7 +20,16 @@ from utils.track_utils import (
     draw_tracks_on_image,
     create_video_with_tracks,
 )
-
+from utils.shoe_utils import (
+    load_shoe_labels,
+    summarize_frame_shoes,
+    draw_shoes_summary_on_image,
+)
+from utils.mask_utils import (
+    load_mask,
+    apply_mask_to_frame,
+    get_masks_config
+)
 
 # Защитная обертка для получения инфо о видео без жесткой зависимости от cv2
 def _is_cv2_usable():
@@ -49,17 +58,21 @@ def get_video_info_safe(path: str) -> dict:
     except Exception:
         return {}
 
-
 def handle_video_mode_change():
-    """Обработчик изменения режима видео"""
-    if st.session_state.video_mode:
-        # Если включили режим видео - снимаем все остальные галочки
-        st.session_state.yolo_enabled = False
-        st.session_state.track_id = False
-        st.session_state.shoe1 = False
-        st.session_state.shoe2 = False
-        st.session_state.shoe_instecation = False
+    """Отключает все трекеры при переходе в режим видео"""
+    st.session_state.track_id = False
+    st.session_state.bot_sort = False
+    st.session_state.bot_sort_reid = False
+    st.session_state.byte_track = False
 
+def select_tracker(tracker_name: str):
+    """Активирует только выбранный трекер"""
+    tracker_keys = ["track_id", "bot_sort", "bot_sort_reid", "byte_track"]
+
+    for key in tracker_keys:
+        st.session_state[key] = (key == tracker_name)
+
+    st.session_state.video_mode = False
 
 def handle_other_checkboxes_change():
     """Обработчик изменения других чекбоксов"""
@@ -67,6 +80,39 @@ def handle_other_checkboxes_change():
     if st.session_state.video_mode:
         st.session_state.video_mode = False
 
+
+def handle_tracker_change():
+    """Обработчик для трекер-чекбоксов: выключает режим видео и обеспечивает эксклюзивный выбор трекера"""
+    # Всегда выключаем видеорежим, как и для других чекбоксов
+    if st.session_state.video_mode:
+        st.session_state.video_mode = False
+    # Обеспечим, чтобы был активен только один трекер
+    flags = [
+        ("track_id", bool(st.session_state.get("track_id", False))),
+        ("bot_sort", bool(st.session_state.get("bot_sort", False))),
+        ("bot_sort_reid", bool(st.session_state.get("bot_sort_reid", False))),
+        ("byte_track", bool(st.session_state.get("byte_track", False))),
+    ]
+    # Оставим включенным первый найденный True по приоритету, остальные выключим
+    active_found = False
+    for key, val in flags:
+        if val and not active_found:
+            active_found = True
+        else:
+            st.session_state[key] = False
+
+@st.cache_data(show_spinner=False)
+def _load_masks():
+    """Загружает маски из assets/mask"""
+    masks_config = get_masks_config()
+    masks = {}
+    for mask_name, config in masks_config.items():
+        masks[mask_name] = load_mask(config["path"])
+    return masks
+
+# Загружаем маски
+masks = _load_masks()
+masks_config = get_masks_config()
 
 # Инициализация состояния приложения
 if 'is_playing' not in st.session_state:
@@ -84,12 +130,18 @@ if 'yolo_enabled' not in st.session_state:
     st.session_state.yolo_enabled = True
 if 'track_id' not in st.session_state:
     st.session_state.track_id = False
+if 'bot_sort' not in st.session_state:
+    st.session_state.bot_sort = False
+if 'bot_sort_reid' not in st.session_state:
+    st.session_state.bot_sort_reid = False
+if 'byte_track' not in st.session_state:
+    st.session_state.byte_track = False
 if 'shoe1' not in st.session_state:
     st.session_state.shoe1 = True
-if 'shoe2' not in st.session_state:
-    st.session_state.shoe2 = True
-if 'shoe_instecation' not in st.session_state:
-    st.session_state.shoe_instecation = True
+if 'floor' not in st.session_state:
+    st.session_state.floor = True
+if 'window' not in st.session_state:
+    st.session_state.window = True
 
 # Настройка страницы
 st.set_page_config(
@@ -98,7 +150,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Минималистичный стиль в светлых тонах
 st.markdown("""
     <style>
     .main {
@@ -136,6 +187,7 @@ st.markdown("""
 # Заголовок
 st.title("Safe Play")
 
+
 # Создаем три колонки
 col1, col2, col3 = st.columns([1, 3, 1.2])
 
@@ -145,9 +197,8 @@ with col1:
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
-    st.markdown("**Детекции YOLO**")
     yolo_enabled = st.checkbox(
-        "Показывать детекции YOLO",
+        "Детекции YOLO",
         value=st.session_state.yolo_enabled,
         key="yolo_enabled",
         on_change=handle_other_checkboxes_change
@@ -155,7 +206,7 @@ with col1:
 
     # Фильтр по уверенности
     if yolo_enabled:
-        st.markdown("**Фильтр уверенности**")
+        #st.markdown("**Фильтр уверенности**")
         st.session_state.min_confidence = st.slider(
             "Минимальная уверенность",
             min_value=0.0,
@@ -168,9 +219,39 @@ with col1:
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
     track_id = st.checkbox(
-        "Показывать OC SORT трекер",
-        value=st.session_state.track_id,
+        "OC SORT",
         key="track_id",
+        on_change=select_tracker,
+        args=("track_id",),
+    )
+
+    #bot_sort = st.checkbox(
+    #    "BoT SORT",
+    #    key="bot_sort",
+    #    on_change=select_tracker,
+    #    args=("bot_sort",),
+    #)
+
+    bot_sort_reid = st.checkbox(
+        "BoT SORT ReID",
+        key="bot_sort_reid",
+        on_change=select_tracker,
+        args=("bot_sort_reid",),
+    )
+
+    #byte_track = st.checkbox(
+    #    "BYTETrack",
+    #    key="byte_track",
+    #    on_change=select_tracker,
+    #    args=("byte_track",),
+    #)
+
+    st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
+
+    shoe_classification_1 = st.checkbox(
+        "Классификация обуви",
+        value=st.session_state.shoe1,
+        key="shoe1",
         on_change=handle_other_checkboxes_change
     )
 
@@ -179,7 +260,7 @@ with col1:
     # Режим видео
     st.markdown("**Режим воспроизведения**")
     video_mode = st.checkbox(
-        "Режим видео",
+        "Видео",
         value=st.session_state.video_mode,
         key="video_mode",
         on_change=handle_video_mode_change
@@ -191,39 +272,55 @@ with col1:
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
-    shoe_classification_1 = st.checkbox(
-        "Shoe Classification",
-        value=st.session_state.shoe1,
-        key="shoe1",
+    floor = st.checkbox(
+        "Пол",
+        value=st.session_state.floor,
+        key="floor",
         on_change=handle_other_checkboxes_change
     )
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
-    shoe_classification_2 = st.checkbox(
-        "Shoe Classification",
-        value=st.session_state.shoe2,
-        key="shoe2",
-        on_change=handle_other_checkboxes_change
-    )
-
-    st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
-
-    shoe_instecation = st.checkbox(
-        "Shoe Instecation",
-        value=st.session_state.shoe_instecation,
-        key="shoe_instecation",
+    window = st.checkbox(
+        "Окна",
+        value=st.session_state.window,
+        key="window",
         on_change=handle_other_checkboxes_change
     )
 
 # Центральная панель - Видео
 with col2:
-    st.markdown("### People Detection")
-
     # Пути к данным
     video_file_path = "data/raw/basketball_000.mp4"
     det_json_path = "assets/yolo_det/basketball_000.json"
-    tracks_txt_path = "assets/tracks/basketball_000.txt"
+
+    # Определение активного трекера и файла разметки
+    active_tracker_key = None
+    active_tracker_label = None
+    if st.session_state.get("track_id", False):
+        active_tracker_key = "oc_sort"
+        active_tracker_label = "OC SORT"
+    elif st.session_state.get("bot_sort", False):
+        active_tracker_key = "bot_sort"
+        active_tracker_label = "Bot Sort"
+    elif st.session_state.get("bot_sort_reid", False):
+        active_tracker_key = "bot_sort_reid"
+        active_tracker_label = "Bot Sort (ReID)"
+    elif st.session_state.get("byte_track", False):
+        active_tracker_key = "byte_track"
+        active_tracker_label = "ByteTrack"
+
+    # Выбор файла треков по активному трекеру
+    if active_tracker_key == "oc_sort":
+        tracks_txt_path = "assets/tracks/oc_sort_basketball_000.txt"
+    elif active_tracker_key == "bot_sort":
+        tracks_txt_path = "assets/tracks/bot_sort_basketball_000.txt"
+    elif active_tracker_key == "bot_sort_reid":
+        tracks_txt_path = "assets/tracks/bot_sort_reid_basketball_000.txt"
+    elif active_tracker_key == "byte_track":
+        tracks_txt_path = "assets/tracks/byte_track_basketball_000.txt"
+    else:
+        tracks_txt_path = None
 
     # Информация о видео
     frames = 0
@@ -251,8 +348,14 @@ with col2:
     def _load_tracks(path):
         return load_mot_tracks(path)
 
+    @st.cache_data(show_spinner=False)
+    def _load_shoes(path):
+        return load_shoe_labels(path)
+
     det_data = _load_json(det_json_path) if os.path.exists(det_json_path) else {"results": []}
-    tracks_data = _load_tracks(tracks_txt_path) if os.path.exists(tracks_txt_path) else {"tracks": []}
+    tracks_data = _load_tracks(tracks_txt_path) if (tracks_txt_path and os.path.exists(tracks_txt_path)) else {"tracks": []}
+    shoes_json_path = "assets/shoes/basketball_000.shoe_labels.json"
+    shoes_data = _load_shoes(shoes_json_path) if os.path.exists(shoes_json_path) else {"labels": []}
 
     # Если число кадров неизвестно, попробуем взять из JSON
     if frames == 0:
@@ -368,6 +471,9 @@ with col2:
                         status_text.empty()
 
             with col2:
+                # Флаг: включать ли обувь в видео трекера
+                include_shoes_in_tracker_video = st.checkbox("👟 Включить обувь в видео трекера", value=False)
+
                 # Кнопка для создания видео с трекером (OC-SORT MOT)
                 if st.button("🎥 Создать видео с трекером", use_container_width=True):
                     with st.spinner("Создание видео с трекером... Это может занять некоторое время."):
@@ -390,7 +496,8 @@ with col2:
                             video_file_path,
                             tracks_data,
                             output_path_tr,
-                            progress_callback=progress_callback_tr
+                            progress_callback=progress_callback_tr,
+                            shoe_data=shoes_data if include_shoes_in_tracker_video else None,
                         )
 
                         if success_tr:
@@ -429,6 +536,29 @@ with col2:
                 yolo_count = None
                 track_count = None
 
+                # Применяем маски если чекбоксы активны
+                if st.session_state.floor:
+                    floor_mask = masks.get("floor")
+                    if floor_mask is not None:
+                        floor_config = masks_config["floor"]
+                        img = apply_mask_to_frame(
+                            img,
+                            floor_mask,
+                            color=floor_config["color"],
+                            alpha=floor_config["alpha"]
+                        )
+
+                if st.session_state.window:
+                    window_mask = masks.get("window")
+                    if window_mask is not None:
+                        window_config = masks_config["window"]
+                        img = apply_mask_to_frame(
+                            img,
+                            window_mask,
+                            color=window_config["color"],
+                            alpha=window_config["alpha"]
+                        )
+
                 if st.session_state.yolo_enabled:
                     # читаем детекции с учетом фильтра уверенности и рисуем боксы
                     dets = get_frame_detections(
@@ -439,7 +569,7 @@ with col2:
                     yolo_count = len(dets)
                     img = draw_bboxes_on_image(img, dets)
 
-                if st.session_state.track_id:
+                if active_tracker_key is not None:
                     tracks = get_frame_tracks(tracks_data, frame_idx) if 'tracks_data' in locals() else []
                     track_count = len(tracks)
 
@@ -465,13 +595,21 @@ with col2:
 
                     img = draw_tracks_on_image(img, tracks, track_history)
 
+                # Обувь: отрисовка сводки по кадру при активном флаге
+                if st.session_state.shoe1:
+                    try:
+                        counts, avg_conf = summarize_frame_shoes(shoes_data, frame_idx)
+                        img = draw_shoes_summary_on_image(img, counts, avg_conf)
+                    except Exception:
+                        pass
+
                 rgb = img[:, :, ::-1]
 
                 # Build caption
                 parts = [f"Кадр {frame_idx}"]
                 if st.session_state.yolo_enabled:
                     parts.append(f"YOLO: {yolo_count} (conf ≥ {st.session_state.min_confidence:.2f})")
-                if st.session_state.track_id:
+                if active_tracker_key is not None:
                     parts.append(f"Tracks: {track_count}")
                 caption = " — ".join(parts)
 
@@ -507,7 +645,7 @@ with col2:
 
 # Правая панель - Статистика
 with col3:
-    st.markdown("### 📊 Статистика")
+    st.markdown("### Статистика")
 
     # Статистика видео
     if os.path.exists(video_file_path):
@@ -589,7 +727,7 @@ with col3:
             html = "\n".join(rows)
             st.markdown(f"""
                 <div class='metric-card'>
-                    <div class='stat-label'>📹 Информация о видео</div>
+                    <div class='stat-label'> Информация о видео</div>
                     <div style='margin-top: 0.75rem;'>
                         {html}
                     </div>
@@ -598,7 +736,7 @@ with col3:
         except Exception as e:
             st.markdown("""
                 <div class='metric-card'>
-                    <div class='stat-label'>📹 Информация о видео</div>
+                    <div class='stat-label'> Информация о видео</div>
                     <div style='color: #dc3545; font-size: 0.875rem; margin-top: 0.5rem;'>
                         Не удалось загрузить статистику
                     </div>
@@ -623,38 +761,102 @@ with col3:
 
         st.markdown(f"""
             <div class='metric-card'>
-                <div class='stat-label'>Детекции YOLO{conf_info}</div>
                 <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.5rem;'>
-                    <div>Количество детекций: <span style='float: right; color: #212529;'>{len(cur_dets)}</span></div>
+                    <div>YOLO детекций: {conf_info} <span style='float: right; color: #212529;'>{len(cur_dets)}</span></div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
     except Exception:
         pass
 
-    # Трекер OC SORT — количество треков на текущем кадре
+    # Трекеры — количество треков на текущем кадре + расширенная статистика (показываем только при выбранном трекере)
     try:
-        cur_f_tr = int(st.session_state.get('current_frame', 0))
-        cur_tracks = get_frame_tracks(tracks_data, cur_f_tr) if 'tracks_data' in locals() else []
+        if 'active_tracker_key' in locals() and active_tracker_key is not None:
+            cur_f_tr = int(st.session_state.get('current_frame', 0))
+            cur_tracks = get_frame_tracks(tracks_data, cur_f_tr) if 'tracks_data' in locals() else []
+
+            # Заголовок с числом треков на текущем кадре
+            tracker_title = active_tracker_label + " треков" if active_tracker_label else "Треков"
+            st.markdown(f"""
+                <div class='metric-card'>
+                    <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.5rem;'>
+                        <div>{tracker_title}: <span style='float: right; color: #212529;'>{len(cur_tracks)}</span></div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # Дополнительная статистика по выбранному трекеру
+            if 'tracks_data' in locals() and tracks_data.get('tracks'):
+                tracks_list = tracks_data.get('tracks', [])
+                # Подсчет уникальных ID и длины треков
+                from collections import defaultdict
+                lengths = defaultdict(int)
+                for t in tracks_list:
+                    try:
+                        lengths[int(t.get('id'))] += 1
+                    except Exception:
+                        continue
+                unique_ids = len(lengths)
+                avg_len = (sum(lengths.values()) / unique_ids) if unique_ids > 0 else 0.0
+                max_len = max(lengths.values()) if lengths else 0
+                min_len = min(lengths.values()) if lengths else 0
+
+                # Имя файла и префикс
+                import os as _os
+                source_path = tracks_data.get('meta', {}).get('source')
+                base_name = _os.path.basename(source_path) if source_path else '—'
+                prefix = base_name.split('_')[0] if base_name and '_' in base_name else '—'
+
+                # Рендерим под строкой с количеством треков
+                st.markdown(f"""
+                    <div class='metric-card'>
+                        <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.25rem;'>
+                            <div>Активный трекер: <span style='float: right; color: #212529;'>{active_tracker_label or '—'}</span></div>
+                            <div>Файл разметки: <span style='float: right; color: #212529;'>{base_name}</span></div>
+                            <div>Уникальных ID: <span style='float: right; color: #212529;'>{unique_ids}</span></div>
+                            <div>Средняя длина трека (кадры): <span style='float: right; color: #212529;'>{avg_len:.2f}</span></div>
+                            <div>Мин/Макс длина трека: <span style='float: right; color: #212529;'>{min_len} / {max_len}</span></div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+    except Exception:
+        pass
+
+    # Обувь на текущем кадре — вместо Note
+    try:
+        cur_f_sh = int(st.session_state.get('current_frame', 0))
+        counts, avg_conf = summarize_frame_shoes(shoes_data if 'shoes_data' in locals() else {"labels": []}, cur_f_sh)
+        if counts:
+            # Формируем HTML-список: Класс — Кол-во (ср. уверенность)
+            items = []
+            for cls in sorted(counts.keys()):
+                cnt = counts.get(cls, 0)
+                conf = avg_conf.get(cls, None)
+                if conf is not None:
+                    items.append(f"<div>{cls}: <span style='float: right; color: #212529;'>{cnt} (avg {conf:.2f})</span></div>")
+                else:
+                    items.append(f"<div>{cls}: <span style='float: right; color: #212529;'>{cnt}</span></div>")
+            items_html = "\n".join(items)
+        else:
+            items_html = "<div style='color: #6c757d;'>Нет данных об обуви на этом кадре</div>"
 
         st.markdown(f"""
             <div class='metric-card'>
-                <div class='stat-label'>Трекер OC SORT</div>
+                <div class='stat-label'>Обувь на кадре</div>
                 <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.5rem;'>
-                    <div>Количество треков: <span style='float: right; color: #212529;'>{len(cur_tracks)}</span></div>
+                    {items_html}
                 </div>
             </div>
         """, unsafe_allow_html=True)
     except Exception:
-        pass
-
-    # Note
-    st.markdown("""
-        <div class='metric-card'>
-            <div class='stat-label'>Note:</div>
-            <div style='color: #212529; font-size: 1rem;'>80.4; 135.ikm 🔘</div>
-        </div>
-    """, unsafe_allow_html=True)
+        st.markdown("""
+            <div class='metric-card'>
+                <div class='stat-label'>Обувь на кадре</div>
+                <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.5rem;'>
+                    Нет данных
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
     # Detect Id
     st.markdown("""

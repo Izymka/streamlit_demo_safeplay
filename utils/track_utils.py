@@ -241,7 +241,8 @@ def create_video_with_tracks(
         video_path: str,
         tracks_data: Dict[str, Any],
         output_path: str,
-        progress_callback=None
+        progress_callback=None,
+        shoe_data: Dict[str, Any] = None,
 ) -> bool:
     """Create a video with OC-SORT tracks drawn on each frame.
 
@@ -250,6 +251,7 @@ def create_video_with_tracks(
         tracks_data: Parsed MOT-format tracks as returned by `load_mot_tracks`.
         output_path: Path to save the output video (e.g., .mp4).
         progress_callback: Optional function(frame_idx: int, total_frames: int) -> None for UI progress.
+        shoe_data: Optional shoe labels dict to overlay per-frame shoe summary.
 
     Returns:
         True on success, False otherwise.
@@ -265,6 +267,9 @@ def create_video_with_tracks(
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         return False
+
+    # Lazy imports to avoid hard dependency if not used
+    from .shoe_utils import summarize_frame_shoes, draw_shoes_summary_on_image  # type: ignore
 
     try:
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -296,6 +301,14 @@ def create_video_with_tracks(
 
             # --- передача истории в рисовалку ---
             frame_with_tracks = draw_tracks_on_image(frame, tracks, track_history)
+
+            # --- опционально рисуем сводку по обуви ---
+            if shoe_data:
+                try:
+                    counts, avg_conf = summarize_frame_shoes(shoe_data, frame_idx)
+                    frame_with_tracks = draw_shoes_summary_on_image(frame_with_tracks, counts, avg_conf)
+                except Exception:
+                    pass
 
             out.write(frame_with_tracks)
 
