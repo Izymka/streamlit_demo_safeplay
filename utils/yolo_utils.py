@@ -273,7 +273,7 @@ def create_video_with_detections(
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
         # Create video writer
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        fourcc = cv2.VideoWriter_fourcc(*'h264')
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
         frame_idx = 0

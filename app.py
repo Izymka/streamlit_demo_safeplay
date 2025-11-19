@@ -139,14 +139,15 @@ if 'bot_sort_reid' not in st.session_state:
 if 'shoe1' not in st.session_state:
     st.session_state.shoe1 = True
 if 'floor' not in st.session_state:
-    st.session_state.floor = True
+    st.session_state.floor = False
 if 'window' not in st.session_state:
-    st.session_state.window = True
-
+    st.session_state.window = False
+if 'selected_video' not in st.session_state:
+    st.session_state.selected_video = "Исходное видео"
 # Настройка страницы
 st.set_page_config(
     page_title="Safe Play",
-    page_icon="👥",
+    page_icon="assets/safe_play.png",
     layout="wide"
 )
 
@@ -286,10 +287,6 @@ with col1:
 
 # Центральная панель - Видео
 with col2:
-    # Пути к данным
-    video_file_path = "data/raw/basketball_000.mp4"
-    det_json_path = "assets/yolo_det/basketball_000.json"
-
     # Выбор файла треков по активному трекеру
     if active_tracker_key == "oc_sort":
         tracks_txt_path = "assets/tracks/oc_sort_basketball_000.txt"
@@ -302,9 +299,28 @@ with col2:
     else:
         tracks_txt_path = None
 
+    # Список доступных видео
+    VIDEO_FILES = {
+        "Исходное видео": "data/raw/basketball_000.mp4",
+        "Детекции YOLO": "assets/video/detections.mp4",
+        "OC Sort": "assets/video/oc_sort.mp4",
+        "OC Sort + обувь": "assets/video/oc_sort_shoes.mp4",
+        "OC Sort + roi": "assets/video/oc_sort_roi.mp4",
+        "OC Sort + обувь + roi": "assets/video/oc_sort_shoes_roi.mp4",
+        "BoT Sort": "assets/video/bot_sort.mp4",
+        "BoT Sort + обувь": "assets/video/bot_sort_shoes.mp4",
+        "BoT Sort + roi": "assets/video/bot_sort_roi.mp4",
+        "BoT Sort + обувь + roi": "assets/video/bot_sort_shoes_roi.mp4",
+    }
+
+    # Пути к данным - теперь используем выбранное видео
+    selected_video_path = VIDEO_FILES[st.session_state.selected_video]
+    det_json_path = "assets/yolo_det/basketball_000.json"
+
     # Информация о видео
     frames = 0
     fps = 0.0
+    video_file_path = selected_video_path
     if os.path.exists(video_file_path):
         try:
             vid_info = get_video_info_safe(video_file_path)
@@ -318,19 +334,37 @@ with col2:
     else:
         st.session_state.video_duration = 0
 
+    if video_mode:
+        # РЕЖИМ ВИДЕО - показываем выпадающее меню
+        # Выпадающее меню для выбора видео
+        selected_video = st.selectbox(
+            "Выберите видео для просмотра:",
+            options=list(VIDEO_FILES.keys()),
+            index=list(VIDEO_FILES.keys()).index(st.session_state.selected_video),
+            key="video_selector"
+        )
+
+        # Обновляем выбранное видео если изменилось
+        if selected_video != st.session_state.selected_video:
+            st.session_state.selected_video = selected_video
+            st.rerun()
+
 
     # Загрузка детекций
     @st.cache_data(show_spinner=False)
     def _load_json(path):
         return load_detections(path)
 
+
     @st.cache_data(show_spinner=False)
     def _load_tracks(path):
         return load_mot_tracks(path)
 
+
     @st.cache_data(show_spinner=False)
     def _load_shoes(path):
         return load_shoe_labels(path)
+
 
     det_data = _load_json(det_json_path) if os.path.exists(det_json_path) else {"results": []}
     tracks_data = _load_tracks(tracks_txt_path) if (tracks_txt_path and os.path.exists(tracks_txt_path)) else {
@@ -369,8 +403,17 @@ with col2:
     # Отрисовка
     if os.path.exists(video_file_path):
         if video_mode:
+
+            # Показываем выбранное видео (без лишней надписи)
+            if os.path.exists(selected_video_path):
+                with open(selected_video_path, "rb") as vf:
+                    video_bytes = vf.read()
+                st.video(video_bytes, format="video/mp4")
+            else:
+                st.error(f"Файл не найден: {selected_video_path}")
+
             # Режим видео с детекциями
-            st.markdown("#### Режим видео")
+            st.markdown("#### Создание видео")
 
             # Создаем колонки для кнопок и флагов
             col_buttons, col_flags = st.columns([2, 1])
@@ -394,6 +437,7 @@ with col2:
                                 progress = frame_idx / total_frames
                                 progress_bar.progress(progress)
                                 status_text.text(f"Обработка кадра {frame_idx}/{total_frames}")
+
 
                         # Создаем видео
                         success = create_video_with_detections(
@@ -441,6 +485,7 @@ with col2:
                                 progress = frame_idx / total_frames
                                 progress_bar_tr.progress(progress)
                                 status_text_tr.text(f"Обработка кадра {frame_idx}/{total_frames}")
+
 
                         # Загружаем треки OC-SORT
                         oc_sort_tracks_path = "assets/tracks/oc_sort_basketball_000.txt"
@@ -552,15 +597,9 @@ with col2:
                 # Флаг: включать ли ROI зоны
                 include_roi_zones = st.checkbox(
                     "📐 Включить ROI зоны",
-                    value=st.session_state.get("include_roi_zones", True),
+                    value=st.session_state.get("include_roi_zones", False),
                     key="include_roi_zones"
                 )
-
-            # Показываем оригинальное видео
-            st.markdown("**Исходное видео:**")
-            with open(video_file_path, "rb") as vf:
-                st.video(vf.read())
-
         else:
             # Режим покадрового просмотра
             frame_idx = st.session_state.current_frame
@@ -655,42 +694,42 @@ with col2:
             display: flex; align-items: center; justify-content: center; color: #6c757d;'>
                 <div style='text-align: center;'>
                     <h2>📹 Video Not Found</h2>
-                    <p>Поместите видеофайл в: data/raw/basketball_000.mp4</p>
+                    <p>Видеофайл не найден: {}</p>
                 </div>
             </div>
-            """,
+            """.format(selected_video_path),
             unsafe_allow_html=True,
         )
+    # Кнопки навигации и управления - ПОКАЗЫВАТЬ ТОЛЬКО В ПОКАДРОВОМ РЕЖИМЕ
+    if not video_mode:
+        control_cols = st.columns([1.5, 2, 1.5, 1.5, 1.5, 1.5, 2])
 
-    # Кнопки навигации и управления
-    control_cols = st.columns([1.5, 2, 1.5, 1.5, 1.5, 1.5, 2])
+        with control_cols[1]:
+            if st.button("⏮️ Начало"):
+                st.session_state.current_frame = 0
+                st.rerun()
 
-    with control_cols[1]:
-        if st.button("⏮️ Начало"):
-            st.session_state.current_frame = 0
-            st.rerun()
+        with control_cols[2]:
+            if st.button("◀️ -10"):
+                st.session_state.current_frame = max(0, st.session_state.current_frame - 10)
+                st.rerun()
 
-    with control_cols[2]:
-        if st.button("◀️ -10"):
-            st.session_state.current_frame = max(0, st.session_state.current_frame - 10)
-            st.rerun()
+        with control_cols[3]:
+            if st.button("◀️ -1"):
+                st.session_state.current_frame = max(0, st.session_state.current_frame - 1)
+                st.rerun()
 
-    with control_cols[3]:
-        if st.button("◀️ -1"):
-            st.session_state.current_frame = max(0, st.session_state.current_frame - 1)
-            st.rerun()
+        with control_cols[4]:
+            if st.button("▶️ +1"):
+                max_frame_idx = max(0, (frames - 1) if frames else 0)
+                st.session_state.current_frame = min(max_frame_idx, st.session_state.current_frame + 1)
+                st.rerun()
 
-    with control_cols[4]:
-        if st.button("▶️ +1"):
-            max_frame_idx = max(0, (frames - 1) if frames else 0)
-            st.session_state.current_frame = min(max_frame_idx, st.session_state.current_frame + 1)
-            st.rerun()
-
-    with control_cols[5]:
-        if st.button("⏭️ +10"):
-            max_frame_idx = max(0, (frames - 1) if frames else 0)
-            st.session_state.current_frame = min(max_frame_idx, st.session_state.current_frame + 10)
-            st.rerun()
+        with control_cols[5]:
+            if st.button("⏭️ +10"):
+                max_frame_idx = max(0, (frames - 1) if frames else 0)
+                st.session_state.current_frame = min(max_frame_idx, st.session_state.current_frame + 10)
+                st.rerun()
 
 # Правая панель - Статистика
 with col3:
