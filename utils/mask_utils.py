@@ -82,7 +82,7 @@ def get_masks_config():
         "floor": {
             "path": os.path.join(mask_dir, "floor_mask.png"),
             "color": (0, 255, 0),  # Зеленый
-            "alpha": 0.6
+            "alpha": 0.3
         },
         "window": {
             "path": os.path.join(mask_dir, "window_mask.png"),  # именно window_mask.png

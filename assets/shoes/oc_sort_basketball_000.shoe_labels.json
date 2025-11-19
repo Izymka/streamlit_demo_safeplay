@@ -1,0 +1,598 @@
+{
+  "5": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 0,
+    "max_area": 2667.8121
+  },
+  "4": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 0,
+    "max_area": 976.6518
+  },
+  "3": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 0,
+    "max_area": 1569.6477999999997
+  },
+  "2": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 0,
+    "max_area": 944.58
+  },
+  "1": {
+    "class": "Sneakers",
+    "confidence": 0.744,
+    "frame": 1312,
+    "area": 3727.9,
+    "crop_size": "64x64"
+  },
+  "6": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 5,
+    "max_area": 1603.2296000000001
+  },
+  "7": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 6,
+    "max_area": 876.3620999999999
+  },
+  "8": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 7,
+    "max_area": 3309.0432
+  },
+  "9": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 9,
+    "max_area": 647.7237
+  },
+  "11": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 22,
+    "max_area": 881.9585
+  },
+  "12": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 33,
+    "max_area": 965.2871999999999
+  },
+  "15": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 36,
+    "max_area": 768.3364
+  },
+  "16": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 51,
+    "max_area": 3476.7945
+  },
+  "14": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 52,
+    "max_area": 2492.7185999999997
+  },
+  "18": {
+    "class": "Sneakers",
+    "confidence": 0.909,
+    "frame": 394,
+    "area": 3682.8,
+    "crop_size": "64x64"
+  },
+  "20": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 98,
+    "max_area": 893.5601999999999
+  },
+  "19": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 98,
+    "max_area": 544.7195999999999
+  },
+  "21": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 135,
+    "max_area": 851.8072
+  },
+  "22": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 147,
+    "max_area": 1350.1952999999999
+  },
+  "23": {
+    "class": "Sneakers",
+    "confidence": 0.819,
+    "frame": 624,
+    "area": 3702.5,
+    "crop_size": "64x64"
+  },
+  "25": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 295,
+    "max_area": 2013.0246
+  },
+  "26": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 312,
+    "max_area": 332.459
+  },
+  "28": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 314,
+    "max_area": 1546.1782
+  },
+  "29": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 324,
+    "max_area": 1632.2001000000002
+  },
+  "30": {
+    "class": "Sneakers",
+    "confidence": 0.751,
+    "frame": 433,
+    "area": 3712.9,
+    "crop_size": "64x64"
+  },
+  "31": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 376,
+    "max_area": 2852.3556
+  },
+  "33": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 395,
+    "max_area": 1890.4568
+  },
+  "35": {
+    "class": "Sneakers",
+    "confidence": 0.807,
+    "frame": 418,
+    "area": 3751.5,
+    "crop_size": "64x64"
+  },
+  "36": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 413,
+    "max_area": 949.45
+  },
+  "40": {
+    "class": "Sneakers",
+    "confidence": 0.66,
+    "frame": 565,
+    "area": 4367.8,
+    "crop_size": "64x64"
+  },
+  "41": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 466,
+    "max_area": 2546.0522
+  },
+  "43": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 498,
+    "max_area": 823.4839999999999
+  },
+  "46": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 512,
+    "max_area": 2023.2885
+  },
+  "47": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 521,
+    "max_area": 1218.3534
+  },
+  "48": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 577,
+    "max_area": 346.58820000000003
+  },
+  "49": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 580,
+    "max_area": 2887.008
+  },
+  "37": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 591,
+    "max_area": 1796.0031000000001
+  },
+  "52": {
+    "class": "non-athletic shoes",
+    "confidence": 0.431,
+    "frame": 823,
+    "area": 5247.5,
+    "crop_size": "64x64"
+  },
+  "55": {
+    "class": "pool shoes",
+    "confidence": 0.533,
+    "frame": 744,
+    "area": 3676.2,
+    "crop_size": "64x64"
+  },
+  "53": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 617,
+    "max_area": 2108.7312
+  },
+  "44": {
+    "class": "non-athletic shoes",
+    "confidence": 0.596,
+    "frame": 619,
+    "area": 4085.2,
+    "crop_size": "64x64"
+  },
+  "59": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 648,
+    "max_area": 1595.6262000000002
+  },
+  "60": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 658,
+    "max_area": 855.9264
+  },
+  "63": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 667,
+    "max_area": 2464.32
+  },
+  "42": {
+    "class": "Sneakers",
+    "confidence": 0.618,
+    "frame": 862,
+    "area": 3871.2,
+    "crop_size": "64x64"
+  },
+  "62": {
+    "class": "pool shoes",
+    "confidence": 0.486,
+    "frame": 802,
+    "area": 3778.2,
+    "crop_size": "64x64"
+  },
+  "64": {
+    "class": "Sneakers",
+    "confidence": 0.77,
+    "frame": 739,
+    "area": 3657.5,
+    "crop_size": "64x64"
+  },
+  "61": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 689,
+    "max_area": 2778.0846
+  },
+  "45": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 693,
+    "max_area": 2465.4285
+  },
+  "69": {
+    "class": "Sneakers",
+    "confidence": 0.851,
+    "frame": 816,
+    "area": 3677.3,
+    "crop_size": "64x64"
+  },
+  "67": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 728,
+    "max_area": 740.4390000000001
+  },
+  "73": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 758,
+    "max_area": 2035.9143000000001
+  },
+  "51": {
+    "class": "Sneakers",
+    "confidence": 0.847,
+    "frame": 987,
+    "area": 3729.6,
+    "crop_size": "64x64"
+  },
+  "76": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 787,
+    "max_area": 679.2290999999999
+  },
+  "77": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 795,
+    "max_area": 1236.984
+  },
+  "80": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 825,
+    "max_area": 1798.4430000000002
+  },
+  "84": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 837,
+    "max_area": 1749.28
+  },
+  "83": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 838,
+    "max_area": 2923.8269999999998
+  },
+  "88": {
+    "class": "bare feet",
+    "confidence": 0.825,
+    "frame": 896,
+    "area": 3619.1,
+    "crop_size": "64x64"
+  },
+  "89": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 856,
+    "max_area": 1446.4724
+  },
+  "86": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 859,
+    "max_area": 1463.915
+  },
+  "90": {
+    "class": "bare feet",
+    "confidence": 0.789,
+    "frame": 907,
+    "area": 3605.8,
+    "crop_size": "64x64"
+  },
+  "66": {
+    "class": "Sneakers",
+    "confidence": 0.953,
+    "frame": 966,
+    "area": 4027.1,
+    "crop_size": "64x64"
+  },
+  "91": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 900,
+    "max_area": 664.4484
+  },
+  "92": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 902,
+    "max_area": 1784.9560000000001
+  },
+  "94": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 935,
+    "max_area": 1250.989
+  },
+  "95": {
+    "class": "non-athletic shoes",
+    "confidence": 0.537,
+    "frame": 953,
+    "area": 3799.8,
+    "crop_size": "64x64"
+  },
+  "100": {
+    "class": "pool shoes",
+    "confidence": 0.755,
+    "frame": 1006,
+    "area": 7005.2,
+    "crop_size": "64x64"
+  },
+  "99": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 974,
+    "max_area": 2358.0248
+  },
+  "101": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 984,
+    "max_area": 623.6025
+  },
+  "102": {
+    "class": "Sneakers",
+    "confidence": 0.708,
+    "frame": 1056,
+    "area": 3764.9,
+    "crop_size": "64x64"
+  },
+  "87": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1013,
+    "max_area": 1162.4823999999999
+  },
+  "103": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1022,
+    "max_area": 907.9410999999999
+  },
+  "105": {
+    "class": "Sneakers",
+    "confidence": 0.807,
+    "frame": 1229,
+    "area": 3904.4,
+    "crop_size": "64x64"
+  },
+  "104": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1023,
+    "max_area": 1162.2732
+  },
+  "106": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1035,
+    "max_area": 188.63459999999998
+  },
+  "107": {
+    "class": "pool shoes",
+    "confidence": 0.716,
+    "frame": 1039,
+    "area": 4121.5,
+    "crop_size": "64x64"
+  },
+  "113": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1119,
+    "max_area": 333.5023
+  },
+  "110": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1125,
+    "max_area": 2902.8978
+  },
+  "114": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1157,
+    "max_area": 1050.8519999999999
+  },
+  "115": {
+    "class": "Sneakers",
+    "confidence": 0.835,
+    "frame": 1208,
+    "area": 3781.3,
+    "crop_size": "64x64"
+  },
+  "116": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1196,
+    "max_area": 834.0944999999999
+  },
+  "117": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1212,
+    "max_area": 2154.3340000000003
+  },
+  "119": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1251,
+    "max_area": 1914.9599
+  },
+  "120": {
+    "class": "pool shoes",
+    "confidence": 0.753,
+    "frame": 1299,
+    "area": 4091.4,
+    "crop_size": "64x64"
+  },
+  "121": {
+    "class": "Sneakers",
+    "confidence": 0.837,
+    "frame": 1338,
+    "area": 3750.3,
+    "crop_size": "64x64"
+  },
+  "122": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1339,
+    "max_area": 965.2549
+  },
+  "123": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1353,
+    "max_area": 1803.1677999999997
+  },
+  "124": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1389,
+    "max_area": 415.459
+  },
+  "126": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1465,
+    "max_area": 2123.9088
+  },
+  "127": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1513,
+    "max_area": 631.8756
+  },
+  "128": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1789,
+    "max_area": 1185.8183999999999
+  },
+  "131": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1861,
+    "max_area": 2413.7544
+  },
+  "132": {
+    "class": "Sneakers",
+    "confidence": 0.537,
+    "frame": 1938,
+    "area": 4141.8,
+    "crop_size": "64x64"
+  },
+  "133": {
+    "class": "small_bbox",
+    "confidence": 0.0,
+    "frame": 1940,
+    "max_area": 869.2170000000001
+  }
+}

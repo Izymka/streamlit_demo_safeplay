@@ -1,13 +1,9 @@
 import os
 from typing import Dict, Any, List, Tuple, Optional
 from collections import deque
-
+from .shoe_utils import summarize_frame_shoes, draw_shoes_summary_on_image
 import numpy as np
 
-
-# ----------------------------
-# Parsing & data access
-# ----------------------------
 
 def load_mot_tracks(txt_path: str) -> Dict[str, Any]:
     """
@@ -38,12 +34,11 @@ def load_mot_tracks(txt_path: str) -> Dict[str, Any]:
                     continue
                 parts = [p.strip() for p in line.split(",")]
                 if len(parts) < 6:
-                    # Some files could be space-separated
-                    parts = [p.strip() for p in line.split()]  # fallback
+                    parts = [p.strip() for p in line.split()]
                 if len(parts) < 6:
                     continue
                 try:
-                    frame = int(float(parts[0]))  # some exporters use float
+                    frame = int(float(parts[0]))
                     track_id = int(float(parts[1]))
                     x = float(parts[2])
                     y = float(parts[3])
@@ -99,10 +94,6 @@ def get_frame_tracks(data: Dict[str, Any], frame_idx: int) -> List[Dict[str, Any
     return out
 
 
-# ----------------------------
-# Drawing helpers
-# ----------------------------
-
 def pleasant_palette() -> List[Tuple[int, int, int]]:
     """A fixed set of pleasant BGR colors (muted but distinct)."""
     # BGR tuples chosen to be eye-pleasing on light background
@@ -133,12 +124,14 @@ def draw_tracks_on_image(
         image_bgr: np.ndarray,
         tracks: List[Dict[str, Any]],
         track_history: Optional[Dict[int, deque]] = None,
+        frame_shoes: Optional[Dict[int, Dict]] = None,
         smooth_trail: bool = True,
         smooth_iters: int = 2,
         trail_thickness: int = 2
 ) -> np.ndarray:
     """
     Draw track bboxes with consistent pleasant colors and ID labels above the box.
+    If frame_shoes is provided, draw shoe type below bbox for each tracker.
 
     Each item in `tracks` must have keys: id, bbox{x1,y1,x2,y2}
 
@@ -146,6 +139,7 @@ def draw_tracks_on_image(
         image_bgr: Input image (BGR)
         tracks: List of track dicts for the current frame
         track_history: Optional mapping track_id -> deque/list of (x, y) points for the trail
+        frame_shoes: Optional dict mapping tracker_id -> shoe info: {tracker_id: {"class": str, "confidence": float}}
         smooth_trail: If True, applies Chaikin smoothing to trails for a smoother look
         smooth_iters: Number of Chaikin iterations (2–3 is usually enough)
         trail_thickness: Thickness of trail line
@@ -158,6 +152,8 @@ def draw_tracks_on_image(
         return image_bgr
 
     out = image_bgr.copy()
+    if frame_shoes is None:
+        frame_shoes = {}
 
     for tr in tracks:
         bbox = (tr or {}).get("bbox", {})
@@ -194,8 +190,36 @@ def draw_tracks_on_image(
         txt_org = (x_bg1 + pad, y_bg2 - pad)
         cv2.putText(out, label, txt_org, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (220, 20, 60), 2, cv2.LINE_AA)
 
+        # Draw shoe type below bbox if available
+        if tid is not None and tid in frame_shoes:
+            shoe_info = frame_shoes[tid]
+            shoe_class = shoe_info.get("class", "Unknown")
+            confidence = shoe_info.get("confidence", 0.0)
+            shoe_text = f"{shoe_class} ({confidence:.2f})"
+
+            (shoe_width, shoe_height), baseline = cv2.getTextSize(shoe_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+
+            # Shoe text background (below bbox)
+            shoe_bg_y1 = y2 + 2
+            shoe_bg_y2 = shoe_bg_y1 + shoe_height + 6
+            shoe_bg_x1 = max(0, x1)  # Ensure doesn't go off left edge
+            shoe_bg_x2 = shoe_bg_x1 + shoe_width + 4
+
+            # Adjust if goes off right edge of image
+            if shoe_bg_x2 > out.shape[1]:
+                shoe_bg_x1 = out.shape[1] - shoe_width - 4
+                shoe_bg_x2 = out.shape[1]
+
+            # Draw semi-transparent background for shoe text
+            shoe_overlay = out.copy()
+            cv2.rectangle(shoe_overlay, (shoe_bg_x1, shoe_bg_y1), (shoe_bg_x2, shoe_bg_y2), (0, 0, 0), -1)
+            cv2.addWeighted(shoe_overlay, 0.6, out, 0.4, 0, out)
+
+            # Draw shoe text
+            cv2.putText(out, shoe_text, (shoe_bg_x1 + 2, shoe_bg_y1 + shoe_height + 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+
     # ----- DRAW TRAILS -----
-    # Рисуем «хвосты» только если передана история
     if track_history is not None:
         def chaikin(points: List[Tuple[int, int]], iterations: int) -> List[Tuple[int, int]]:
             if len(points) < 3 or iterations <= 0:
@@ -268,9 +292,6 @@ def create_video_with_tracks(
     if not cap.isOpened():
         return False
 
-    # Lazy imports to avoid hard dependency if not used
-    from .shoe_utils import summarize_frame_shoes, draw_shoes_summary_on_image  # type: ignore
-
     try:
         fps = cap.get(cv2.CAP_PROP_FPS)
         track_history = {}
@@ -288,21 +309,17 @@ def create_video_with_tracks(
                 break
 
             tracks = get_frame_tracks(tracks_data or {}, frame_idx)
-            # --- обновление истории ---
             for tr in tracks:
                 tid = tr["id"]
                 bbox = tr["bbox"]
                 cx = int((bbox["x1"] + bbox["x2"]) / 2)
-                cy = int(bbox["y2"])  # нижняя граница
+                cy = int(bbox["y2"])
 
                 if tid not in track_history:
                     track_history[tid] = deque(maxlen=25)
                 track_history[tid].append((cx, cy))
 
-            # --- передача истории в рисовалку ---
             frame_with_tracks = draw_tracks_on_image(frame, tracks, track_history)
-
-            # --- опционально рисуем сводку по обуви ---
             if shoe_data:
                 try:
                     counts, avg_conf = summarize_frame_shoes(shoe_data, frame_idx)

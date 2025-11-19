@@ -22,8 +22,7 @@ from utils.track_utils import (
 )
 from utils.shoe_utils import (
     load_shoe_labels,
-    summarize_frame_shoes,
-    draw_shoes_summary_on_image,
+    summarize_all_shoes
 )
 from utils.mask_utils import (
     load_mask,
@@ -31,7 +30,6 @@ from utils.mask_utils import (
     get_masks_config
 )
 
-# Защитная обертка для получения инфо о видео без жесткой зависимости от cv2
 def _is_cv2_usable():
     try:
         import importlib
@@ -40,7 +38,6 @@ def _is_cv2_usable():
         return True
     except Exception:
         return False
-
 
 _CV2_OK = _is_cv2_usable()
 
@@ -66,10 +63,14 @@ def handle_video_mode_change():
     st.session_state.byte_track = False
 
 def select_tracker(tracker_name: str):
-    """Активирует только выбранный трекер"""
-    tracker_keys = ["track_id", "bot_sort", "bot_sort_reid", "byte_track"]
+    # Если пользователь выключает чекбокс — отключить все трекеры
+    if not st.session_state[tracker_name]:
+        for key in ["track_id", "bot_sort_reid"]:
+            st.session_state[key] = False
+        return
 
-    for key in tracker_keys:
+    # Если включает — включить только его
+    for key in ["track_id", "bot_sort_reid"]:
         st.session_state[key] = (key == tracker_name)
 
     st.session_state.video_mode = False
@@ -89,9 +90,7 @@ def handle_tracker_change():
     # Обеспечим, чтобы был активен только один трекер
     flags = [
         ("track_id", bool(st.session_state.get("track_id", False))),
-        ("bot_sort", bool(st.session_state.get("bot_sort", False))),
         ("bot_sort_reid", bool(st.session_state.get("bot_sort_reid", False))),
-        ("byte_track", bool(st.session_state.get("byte_track", False))),
     ]
     # Оставим включенным первый найденный True по приоритету, остальные выключим
     active_found = False
@@ -100,6 +99,11 @@ def handle_tracker_change():
             active_found = True
         else:
             st.session_state[key] = False
+# Маппинг файлов обуви под разные трекеры
+SHOE_LABELS_MAP = {
+    "oc_sort": "assets/shoes/oc_sort_basketball_000.shoe_labels.json",
+    "bot_sort_reid": "assets/shoes/bot_sort_reid_basketball_000.shoe_labels.json",
+}
 
 @st.cache_data(show_spinner=False)
 def _load_masks():
@@ -130,12 +134,8 @@ if 'yolo_enabled' not in st.session_state:
     st.session_state.yolo_enabled = True
 if 'track_id' not in st.session_state:
     st.session_state.track_id = False
-if 'bot_sort' not in st.session_state:
-    st.session_state.bot_sort = False
 if 'bot_sort_reid' not in st.session_state:
     st.session_state.bot_sort_reid = False
-if 'byte_track' not in st.session_state:
-    st.session_state.byte_track = False
 if 'shoe1' not in st.session_state:
     st.session_state.shoe1 = True
 if 'floor' not in st.session_state:
@@ -184,9 +184,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Определение активного трекера и файла разметки
+active_tracker_key = None
+active_tracker_label = None
+if st.session_state.get("track_id", False):
+    active_tracker_key = "oc_sort"
+    active_tracker_label = "OC SORT"
+elif st.session_state.get("bot_sort_reid", False):
+    active_tracker_key = "bot_sort_reid"
+    active_tracker_label = "Bot Sort (ReID)"
+
 # Заголовок
 st.title("Safe Play")
-
 
 # Создаем три колонки
 col1, col2, col3 = st.columns([1, 3, 1.2])
@@ -225,13 +234,6 @@ with col1:
         args=("track_id",),
     )
 
-    #bot_sort = st.checkbox(
-    #    "BoT SORT",
-    #    key="bot_sort",
-    #    on_change=select_tracker,
-    #    args=("bot_sort",),
-    #)
-
     bot_sort_reid = st.checkbox(
         "BoT SORT ReID",
         key="bot_sort_reid",
@@ -239,20 +241,14 @@ with col1:
         args=("bot_sort_reid",),
     )
 
-    #byte_track = st.checkbox(
-    #    "BYTETrack",
-    #    key="byte_track",
-    #    on_change=select_tracker,
-    #    args=("byte_track",),
-    #)
-
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
 
     shoe_classification_1 = st.checkbox(
         "Классификация обуви",
         value=st.session_state.shoe1,
         key="shoe1",
-        on_change=handle_other_checkboxes_change
+        on_change=handle_other_checkboxes_change,
+        disabled=(active_tracker_key is None)  # ❗ работает только при включенном трекере
     )
 
     st.markdown("<hr style='margin:4px 0; opacity:0.3;'>", unsafe_allow_html=True)
@@ -293,22 +289,6 @@ with col2:
     # Пути к данным
     video_file_path = "data/raw/basketball_000.mp4"
     det_json_path = "assets/yolo_det/basketball_000.json"
-
-    # Определение активного трекера и файла разметки
-    active_tracker_key = None
-    active_tracker_label = None
-    if st.session_state.get("track_id", False):
-        active_tracker_key = "oc_sort"
-        active_tracker_label = "OC SORT"
-    elif st.session_state.get("bot_sort", False):
-        active_tracker_key = "bot_sort"
-        active_tracker_label = "Bot Sort"
-    elif st.session_state.get("bot_sort_reid", False):
-        active_tracker_key = "bot_sort_reid"
-        active_tracker_label = "Bot Sort (ReID)"
-    elif st.session_state.get("byte_track", False):
-        active_tracker_key = "byte_track"
-        active_tracker_label = "ByteTrack"
 
     # Выбор файла треков по активному трекеру
     if active_tracker_key == "oc_sort":
@@ -353,48 +333,30 @@ with col2:
         return load_shoe_labels(path)
 
     det_data = _load_json(det_json_path) if os.path.exists(det_json_path) else {"results": []}
-    tracks_data = _load_tracks(tracks_txt_path) if (tracks_txt_path and os.path.exists(tracks_txt_path)) else {"tracks": []}
-    shoes_json_path = "assets/shoes/basketball_000.shoe_labels.json"
-    shoes_data = _load_shoes(shoes_json_path) if os.path.exists(shoes_json_path) else {"labels": []}
+    tracks_data = _load_tracks(tracks_txt_path) if (tracks_txt_path and os.path.exists(tracks_txt_path)) else {
+        "tracks": []}
+    # Загружаем обувь только если выбран трекер
+    if active_tracker_key and active_tracker_key in SHOE_LABELS_MAP:
+        shoes_json_path = SHOE_LABELS_MAP[active_tracker_key]
+        shoes_data = _load_shoes(shoes_json_path) if os.path.exists(shoes_json_path) else {"labels": []}
+    else:
+        shoes_data = {"labels": []}
+
+    # Всегда создаем глобальные переменные для сводки обуви
+    if shoes_data.get("labels"):
+        global_shoe_counts, global_shoe_avg_conf = summarize_all_shoes(shoes_data)
+    else:
+        global_shoe_counts, global_shoe_avg_conf = {}, {}
 
     # Если число кадров неизвестно, попробуем взять из JSON
     if frames == 0:
         try:
-            frames = int(det_data.get("video_info", {}).get("total_frames") or len(det_data.get("results", [])) or 0)
+            frames = int(
+                det_data.get("video_info", {}).get("total_frames") or len(det_data.get("results", [])) or 0)
         except Exception:
             frames = len(det_data.get("results", []))
 
-    # Кнопки навигации и управления
-    control_cols = st.columns([2, 1.5, 1.5, 1.5, 1.5, 4])
-
-    with control_cols[0]:
-        if st.button("⏮️ Начало"):
-            st.session_state.current_frame = 0
-            st.rerun()
-
-    with control_cols[1]:
-        if st.button("◀️ -10"):
-            st.session_state.current_frame = max(0, st.session_state.current_frame - 10)
-            st.rerun()
-
-    with control_cols[2]:
-        if st.button("◀️ -1"):
-            st.session_state.current_frame = max(0, st.session_state.current_frame - 1)
-            st.rerun()
-
-    with control_cols[3]:
-        if st.button("▶️ +1"):
-            max_frame_idx = max(0, (frames - 1) if frames else 0)
-            st.session_state.current_frame = min(max_frame_idx, st.session_state.current_frame + 1)
-            st.rerun()
-
-    with control_cols[4]:
-        if st.button("⏭️ +10"):
-            max_frame_idx = max(0, (frames - 1) if frames else 0)
-            st.session_state.current_frame = min(max_frame_idx, st.session_state.current_frame + 10)
-            st.rerun()
-
-    # Селектор кадра (если не в режиме видео)
+    # Селектор кадра (если не в режиме видео) - ВЫНЕСЕНО ИЗ БЛОКА else
     if not video_mode:
         max_frame_idx = max(0, (frames - 1) if frames else 0)
         st.session_state.current_frame = st.slider(
@@ -404,17 +366,16 @@ with col2:
             value=int(st.session_state.get("current_frame", 0)),
             step=1,
         )
-
     # Отрисовка
     if os.path.exists(video_file_path):
         if video_mode:
             # Режим видео с детекциями
             st.markdown("#### 🎬 Режим видео")
 
-            # Создаем колонки для кнопок
-            col1, col2 = st.columns(2)
+            # Создаем колонки для кнопок и флагов
+            col_buttons, col_flags = st.columns([2, 1])
 
-            with col1:
+            with col_buttons:
                 # Кнопка для создания видео с детекциями
                 if st.button("🎥 Создать видео с детекциями", use_container_width=True):
                     with st.spinner("Создание видео... Это может занять некоторое время."):
@@ -434,7 +395,6 @@ with col2:
                                 progress_bar.progress(progress)
                                 status_text.text(f"Обработка кадра {frame_idx}/{total_frames}")
 
-
                         # Создаем видео
                         success = create_video_with_detections(
                             video_file_path,
@@ -446,11 +406,6 @@ with col2:
 
                         if success:
                             st.success("✅ Видео успешно создано!")
-                            # Показываем видео
-                            #with open(output_path, "rb") as vf:
-                            #    st.video(vf.read())
-
-                            # Кнопка для скачивания
                             with open(output_path, "rb") as vf:
                                 st.download_button(
                                     label="📥 Скачать видео",
@@ -470,12 +425,8 @@ with col2:
                         progress_bar.empty()
                         status_text.empty()
 
-            with col2:
-                # Флаг: включать ли обувь в видео трекера
-                include_shoes_in_tracker_video = st.checkbox("👟 Включить обувь в видео трекера", value=False)
-
-                # Кнопка для создания видео с трекером (OC-SORT MOT)
-                if st.button("🎥 Создать видео с трекером", use_container_width=True):
+                # Кнопка для создания видео с OC-SORT
+                if st.button("🎥 Создать видео с OC-SORT", use_container_width=True):
                     with st.spinner("Создание видео с трекером... Это может занять некоторое время."):
                         temp_output_tr = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                         output_path_tr = temp_output_tr.name
@@ -497,13 +448,12 @@ with col2:
                             tracks_data,
                             output_path_tr,
                             progress_callback=progress_callback_tr,
-                            shoe_data=shoes_data if include_shoes_in_tracker_video else None,
+                            shoe_data=shoes_data if st.session_state.get("include_shoes_in_tracker_video",
+                                                                         False) else None,
                         )
 
                         if success_tr:
                             st.success("✅ Видео с трекером успешно создано!")
-                            #with open(output_path_tr, "rb") as vf:
-                            #    st.video(vf.read())
                             with open(output_path_tr, "rb") as vf:
                                 st.download_button(
                                     label="📥 Скачать видео",
@@ -520,6 +470,74 @@ with col2:
 
                         progress_bar_tr.empty()
                         status_text_tr.empty()
+
+                # Кнопка для создания видео с BoT-SORT
+                if st.button("🎥 Создать видео с BoT-SORT", use_container_width=True):
+                    with st.spinner("Создание видео с BoT-SORT... Это может занять некоторое время."):
+                        temp_output_bot = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+                        output_path_bot = temp_output_bot.name
+                        temp_output_bot.close()
+
+                        progress_bar_bot = st.progress(0)
+                        status_text_bot = st.empty()
+
+
+                        def progress_callback_bot(frame_idx, total_frames):
+                            if total_frames > 0:
+                                progress = frame_idx / total_frames
+                                progress_bar_bot.progress(progress)
+                                status_text_bot.text(f"Обработка кадра {frame_idx}/{total_frames}")
+
+
+                        # Загружаем треки BoT-SORT
+                        bot_sort_tracks_path = "assets/tracks/bot_sort_reid_basketball_000.txt"
+                        bot_sort_tracks_data = _load_tracks(bot_sort_tracks_path) if os.path.exists(
+                            bot_sort_tracks_path) else {"tracks": []}
+
+                        success_bot = create_video_with_tracks(
+                            video_file_path,
+                            bot_sort_tracks_data,
+                            output_path_bot,
+                            progress_callback=progress_callback_bot,
+                            shoe_data=shoes_data if st.session_state.get("include_shoes_in_tracker_video",
+                                                                         False) else None,
+                        )
+
+                        if success_bot:
+                            st.success("✅ Видео с BoT-SORT успешно создано!")
+                            with open(output_path_bot, "rb") as vf:
+                                st.download_button(
+                                    label="📥 Скачать видео",
+                                    data=vf.read(),
+                                    file_name=f"bot_sort_tracks_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
+                                    mime="video/mp4"
+                                )
+                            try:
+                                os.unlink(output_path_bot)
+                            except:
+                                pass
+                        else:
+                            st.error("❌ Ошибка при создании видео с BoT-SORT")
+
+                        progress_bar_bot.empty()
+                        status_text_bot.empty()
+
+            with col_flags:
+                st.markdown("**Настройки видео:**")
+
+                # Флаг: включать ли обувь в видео трекера
+                include_shoes_in_tracker_video = st.checkbox(
+                    "👟 Включить обувь",
+                    value=st.session_state.get("include_shoes_in_tracker_video", False),
+                    key="include_shoes_in_tracker_video"
+                )
+
+                # Флаг: включать ли ROI зоны
+                include_roi_zones = st.checkbox(
+                    "📐 Включить ROI зоны",
+                    value=st.session_state.get("include_roi_zones", True),
+                    key="include_roi_zones"
+                )
 
             # Показываем оригинальное видео
             st.markdown("**Исходное видео:**")
@@ -558,7 +576,6 @@ with col2:
                             color=window_config["color"],
                             alpha=window_config["alpha"]
                         )
-
                 if st.session_state.yolo_enabled:
                     # читаем детекции с учетом фильтра уверенности и рисуем боксы
                     dets = get_frame_detections(
@@ -590,44 +607,29 @@ with col2:
                                     continue
                                 if tid not in track_history:
                                     from collections import deque
+
                                     track_history[tid] = deque(maxlen=history_len)
                                 track_history[tid].append((cx, cy))
 
-                    img = draw_tracks_on_image(img, tracks, track_history)
+                    # Получаем информацию об обуви для текущего кадра
+                    frame_shoes = {}
+                    if st.session_state.shoe1 and active_tracker_key and 'shoes_data' in locals():
+                        try:
+                            from utils.shoe_utils import get_tracker_shoes_static
 
-                # Обувь: отрисовка сводки по кадру при активном флаге
-                if st.session_state.shoe1:
-                    try:
-                        counts, avg_conf = summarize_frame_shoes(shoes_data, frame_idx)
-                        img = draw_shoes_summary_on_image(img, counts, avg_conf)
-                    except Exception:
-                        pass
+                            frame_shoes = get_tracker_shoes_static(shoes_data)
+                        except Exception as e:
+                            print(f"Error getting shoe data: {e}")
+
+                    # Передаем информацию об обуви в функцию отрисовки
+                    img = draw_tracks_on_image(img, tracks, track_history, frame_shoes)
 
                 rgb = img[:, :, ::-1]
 
-                # Build caption
-                parts = [f"Кадр {frame_idx}"]
-                if st.session_state.yolo_enabled:
-                    parts.append(f"YOLO: {yolo_count} (conf ≥ {st.session_state.min_confidence:.2f})")
-                if active_tracker_key is not None:
-                    parts.append(f"Tracks: {track_count}")
-                caption = " — ".join(parts)
-
-                st.image(rgb, caption=caption, use_container_width=True)
+                st.image(rgb, use_container_width=True)
             else:
                 st.warning("⚠️ Не удалось прочитать кадр")
 
-        # Показать длительность, если смогли вычислить
-        if st.session_state.video_duration:
-            mins = st.session_state.video_duration // 60
-            secs = st.session_state.video_duration % 60
-
-            st.markdown(
-                f"<p style='text-align: center; color: gray; font-size: 0.9em;'>"
-                f"Длительность: {mins}:{secs:02d}"
-                f"</p>",
-                unsafe_allow_html=True
-            )
     else:
         # Заглушка, если видео не найдено
         st.markdown(
@@ -643,6 +645,36 @@ with col2:
             unsafe_allow_html=True,
         )
 
+    # Кнопки навигации и управления
+    control_cols = st.columns([1.5, 2, 1.5, 1.5, 1.5, 1.5, 2])
+
+    with control_cols[1]:
+        if st.button("⏮️ Начало"):
+            st.session_state.current_frame = 0
+            st.rerun()
+
+    with control_cols[2]:
+        if st.button("◀️ -10"):
+            st.session_state.current_frame = max(0, st.session_state.current_frame - 10)
+            st.rerun()
+
+    with control_cols[3]:
+        if st.button("◀️ -1"):
+            st.session_state.current_frame = max(0, st.session_state.current_frame - 1)
+            st.rerun()
+
+    with control_cols[4]:
+        if st.button("▶️ +1"):
+            max_frame_idx = max(0, (frames - 1) if frames else 0)
+            st.session_state.current_frame = min(max_frame_idx, st.session_state.current_frame + 1)
+            st.rerun()
+
+    with control_cols[5]:
+        if st.button("⏭️ +10"):
+            max_frame_idx = max(0, (frames - 1) if frames else 0)
+            st.session_state.current_frame = min(max_frame_idx, st.session_state.current_frame + 10)
+            st.rerun()
+
 # Правая панель - Статистика
 with col3:
     st.markdown("### Статистика")
@@ -651,8 +683,6 @@ with col3:
     if os.path.exists(video_file_path):
         try:
             video_info = get_video_info_safe(video_file_path)
-
-            # Готовим безопасные значения
             width = int(video_info.get('width') or 0)
             height = int(video_info.get('height') or 0)
             fps_val = float(video_info.get('fps') or 0)
@@ -749,8 +779,6 @@ with col3:
                     <div style='text-align: center; color: #212529; font-weight: 600; margin-bottom: 0.5rem;'>🔘 Кадр: {cur_f} </div>
             """, unsafe_allow_html=True)
         # Детекции YOLO на текущем кадре
-
-
         cur_dets = get_frame_detections(
             det_data,
             cur_f,
@@ -768,7 +796,6 @@ with col3:
         """, unsafe_allow_html=True)
     except Exception:
         pass
-
     # Трекеры — количество треков на текущем кадре + расширенная статистика (показываем только при выбранном трекере)
     try:
         if 'active_tracker_key' in locals() and active_tracker_key is not None:
@@ -812,7 +839,6 @@ with col3:
                     <div class='metric-card'>
                         <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.25rem;'>
                             <div>Активный трекер: <span style='float: right; color: #212529;'>{active_tracker_label or '—'}</span></div>
-                            <div>Файл разметки: <span style='float: right; color: #212529;'>{base_name}</span></div>
                             <div>Уникальных ID: <span style='float: right; color: #212529;'>{unique_ids}</span></div>
                             <div>Средняя длина трека (кадры): <span style='float: right; color: #212529;'>{avg_len:.2f}</span></div>
                             <div>Мин/Макс длина трека: <span style='float: right; color: #212529;'>{min_len} / {max_len}</span></div>
@@ -822,10 +848,19 @@ with col3:
     except Exception:
         pass
 
-    # Обувь на текущем кадре — вместо Note
+    # Обувь на видео
     try:
-        cur_f_sh = int(st.session_state.get('current_frame', 0))
-        counts, avg_conf = summarize_frame_shoes(shoes_data if 'shoes_data' in locals() else {"labels": []}, cur_f_sh)
+        # Проверка существования shoes_data
+        shoes_data_available = (
+                'shoes_data' in locals() or 'shoes_data' in globals() or
+                'shoes_data' in st.session_state
+        )
+
+        if shoes_data_available and shoes_data and shoes_data.get("labels"):
+            counts, avg_conf = summarize_all_shoes(shoes_data)
+        else:
+            counts, avg_conf = {}, {}
+
         if counts:
             # Формируем HTML-список: Класс — Кол-во (ср. уверенность)
             items = []
@@ -833,44 +868,61 @@ with col3:
                 cnt = counts.get(cls, 0)
                 conf = avg_conf.get(cls, None)
                 if conf is not None:
-                    items.append(f"<div>{cls}: <span style='float: right; color: #212529;'>{cnt} (avg {conf:.2f})</span></div>")
+                    items.append(
+                        f"<div>{cls}: <span style='float: right; color: #212529;'>{cnt} (avg {conf:.2f})</span></div>")
                 else:
                     items.append(f"<div>{cls}: <span style='float: right; color: #212529;'>{cnt}</span></div>")
             items_html = "\n".join(items)
-        else:
-            items_html = "<div style='color: #6c757d;'>Нет данных об обуви на этом кадре</div>"
 
+            # Создаем данные для столбчатой диаграммы в процентах
+            total = sum(counts.values())
+
+            # Подготавливаем данные для графика
+            chart_data = pd.DataFrame({
+                'Тип обуви': list(counts.keys()),
+                'Процент': [(count / total) * 100 for count in counts.values()],
+                'Количество': list(counts.values())
+            }).sort_values('Процент', ascending=False)
+
+            # Создаем столбчатую диаграмму с помощью Streamlit
+            st.markdown("<span style='font-size: 1.0em; color: #6c757d;'>Распределение обуви по типам (%)</span>",
+                        unsafe_allow_html=True)
+
+            # Отображаем график с кастомными настройками
+            st.bar_chart(
+                chart_data.set_index('Тип обуви')['Процент'],
+                height=300,
+                color='#ff4b4b'  # Синий цвет
+            )
+
+            # Добавляем таблицу с подробностями под графиком
+            with st.expander("Детали распределения"):
+                # Форматируем проценты
+                chart_data_display = chart_data.copy()
+                chart_data_display['Процент'] = chart_data_display['Процент'].round(2).astype(str) + '%'
+                st.dataframe(
+                    chart_data_display[['Тип обуви', 'Количество', 'Процент']],
+                    hide_index=True,
+                    use_container_width=True
+                )
+
+        else:
+            st.markdown(
+                "<div style='text-align: right; color: #6c757d; font-size: 0.75rem; margin-top: 0.5rem;'></div>",
+                unsafe_allow_html=True)
+
+    except Exception as e:
         st.markdown(f"""
             <div class='metric-card'>
-                <div class='stat-label'>Обувь на кадре</div>
+                <div class='stat-label'>Обувь на видео</div>
                 <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.5rem;'>
-                    {items_html}
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    except Exception:
-        st.markdown("""
-            <div class='metric-card'>
-                <div class='stat-label'>Обувь на кадре</div>
-                <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.5rem;'>
-                    Нет данных
+                    Нет данных (ошибка: {str(e)})
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
-    # Detect Id
-    st.markdown("""
-        <div class='metric-card'>
-            <div class='stat-label' style='text-align: center; font-size: 1rem;'>Detect Id</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Простая визуализация графика
-    chart_data = pd.DataFrame(
-        np.random.randn(20, 1) * 2 + 5,
-        columns=['Connection (lick)']
-    )
-    st.bar_chart(chart_data, height=150)
+        # Сообщение об ошибке для графика
+        st.error(f"Ошибка при построении диаграммы: {str(e)}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
