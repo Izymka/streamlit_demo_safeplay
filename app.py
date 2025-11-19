@@ -488,6 +488,7 @@ with col2:
 
 
                         # Загружаем треки OC-SORT
+
                         oc_sort_tracks_path = "assets/tracks/oc_sort_basketball_000.txt"
                         oc_sort_tracks_data = _load_tracks(oc_sort_tracks_path) if os.path.exists(
                             oc_sort_tracks_path) else {"tracks": []}
@@ -868,42 +869,25 @@ with col3:
                 </div>
             """, unsafe_allow_html=True)
 
-            # Дополнительная статистика по выбранному трекеру
-            if 'tracks_data' in locals() and tracks_data.get('tracks'):
-                tracks_list = tracks_data.get('tracks', [])
-                # Подсчет уникальных ID и длины треков
-                from collections import defaultdict
-                lengths = defaultdict(int)
-                for t in tracks_list:
-                    try:
-                        lengths[int(t.get('id'))] += 1
-                    except Exception:
-                        continue
-                unique_ids = len(lengths)
-                avg_len = (sum(lengths.values()) / unique_ids) if unique_ids > 0 else 0.0
-                max_len = max(lengths.values()) if lengths else 0
-                min_len = min(lengths.values()) if lengths else 0
-
-                # Имя файла и префикс
-                import os as _os
-                source_path = tracks_data.get('meta', {}).get('source')
-                base_name = _os.path.basename(source_path) if source_path else '—'
-                prefix = base_name.split('_')[0] if base_name and '_' in base_name else '—'
-
-                # Рендерим под строкой с количеством треков
-                st.markdown(f"""
-                    <div class='metric-card'>
-                        <div style='color: #6c757d; font-size: 0.875rem; margin-top: 0.25rem;'>
-                            <div>Активный трекер: <span style='float: right; color: #212529;'>{active_tracker_label or '—'}</span></div>
-                            <div>Уникальных ID: <span style='float: right; color: #212529;'>{unique_ids}</span></div>
-                            <div>Средняя длина трека (кадры): <span style='float: right; color: #212529;'>{avg_len:.2f}</span></div>
-                            <div>Мин/Макс длина трека: <span style='float: right; color: #212529;'>{min_len} / {max_len}</span></div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
     except Exception:
         pass
-
+    try:
+        # Добавляем таблицу с метриками
+        with st.expander("Метрики трекеров"):
+            # Формируем таблицу
+            metrics = pd.DataFrame({
+                'Трекер': ['OC Sort', 'BoT Sort'],
+                'IDF1': [0.49, 0.49],
+                'MOTA': [0.43, 0.43],
+                'Switches':[92, 63]
+            })
+            st.dataframe(
+                metrics,
+                hide_index=True,
+                use_container_width=True
+            )
+    except Exception:
+        pass
     # Обувь на видео
     try:
         # Проверка существования shoes_data
