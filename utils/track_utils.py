@@ -1,7 +1,8 @@
 import os
 from typing import Dict, Any, List, Tuple, Optional
 from collections import deque
-from .shoe_utils import summarize_frame_shoes, draw_shoes_summary_on_image
+from .shoe_utils import summarize_frame_shoes, draw_shoes_summary_on_image, get_tracker_shoes_static
+from .mask_utils import get_masks_config, load_mask, apply_mask_to_frame
 import numpy as np
 
 
@@ -267,15 +268,17 @@ def create_video_with_tracks(
         output_path: str,
         progress_callback=None,
         shoe_data: Dict[str, Any] = None,
+        include_roi_zones: bool = False,
 ) -> bool:
-    """Create a video with OC-SORT tracks drawn on each frame.
+    """Create a video with OC-SORT/BoT-SORT tracks drawn on each frame.
 
     Args:
         video_path: Path to input video.
         tracks_data: Parsed MOT-format tracks as returned by `load_mot_tracks`.
         output_path: Path to save the output video (e.g., .mp4).
         progress_callback: Optional function(frame_idx: int, total_frames: int) -> None for UI progress.
-        shoe_data: Optional shoe labels dict to overlay per-frame shoe summary.
+        shoe_data: Optional shoe labels dict to overlay: per-track shoe labels and per-frame summary box.
+        include_roi_zones: If True, overlay configured ROI masks (e.g., floor, window) on each frame.
 
     Returns:
         True on success, False otherwise.
@@ -299,6 +302,31 @@ def create_video_with_tracks(
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
+        # Preload ROI masks once
+        floor_mask = window_mask = None
+        floor_cfg = window_cfg = None
+        if include_roi_zones:
+            try:
+                masks_cfg = get_masks_config()
+                if "floor" in masks_cfg:
+                    floor_cfg = masks_cfg["floor"]
+                    floor_mask = load_mask(floor_cfg["path"]) if os.path.exists(floor_cfg["path"]) else None
+                if "window" in masks_cfg:
+                    window_cfg = masks_cfg["window"]
+                    window_mask = load_mask(window_cfg["path"]) if os.path.exists(window_cfg["path"]) else None
+            except Exception:
+                floor_mask = window_mask = None
+                floor_cfg = window_cfg = None
+
+        # Предварительная загрузка статической карты обуви (ID -> Label)
+        # Это гарантирует, что метка будет видна на протяжении всего трека, а не только в кадре детекции
+        static_shoes_map = {}
+        if shoe_data:
+            try:
+                static_shoes_map = get_tracker_shoes_static(shoe_data)
+            except Exception:
+                static_shoes_map = {}
+
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
@@ -308,18 +336,34 @@ def create_video_with_tracks(
             if not ret:
                 break
 
+            # Apply ROI masks first
+            if include_roi_zones:
+                try:
+                    if floor_mask is not None and floor_cfg is not None:
+                        frame = apply_mask_to_frame(frame, floor_mask, color=floor_cfg.get("color", (0,255,0)), alpha=floor_cfg.get("alpha", 0.3))
+                    if window_mask is not None and window_cfg is not None:
+                        frame = apply_mask_to_frame(frame, window_mask, color=window_cfg.get("color", (255,0,0)), alpha=window_cfg.get("alpha", 0.6))
+                except Exception:
+                    pass
+
             tracks = get_frame_tracks(tracks_data or {}, frame_idx)
             for tr in tracks:
                 tid = tr["id"]
                 bbox = tr["bbox"]
                 cx = int((bbox["x1"] + bbox["x2"]) / 2)
-                cy = int(bbox["y2"])
+                cy = int(bbox["y2"])  # bottom center
 
                 if tid not in track_history:
                     track_history[tid] = deque(maxlen=25)
                 track_history[tid].append((cx, cy))
+            # Используем подготовленную статическую карту для отрисовки меток
+            frame_shoes = static_shoes_map
 
-            frame_with_tracks = draw_tracks_on_image(frame, tracks, track_history)
+            # Draw tracks and per-track shoe labels if available
+            frame_with_tracks = draw_tracks_on_image(frame, tracks, track_history, frame_shoes=frame_shoes)
+
+
+            # Draw per-frame shoe summary box (counts/avg conf) if data provided
             if shoe_data:
                 try:
                     counts, avg_conf = summarize_frame_shoes(shoe_data, frame_idx)

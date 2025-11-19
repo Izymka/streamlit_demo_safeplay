@@ -370,14 +370,14 @@ with col2:
     if os.path.exists(video_file_path):
         if video_mode:
             # Режим видео с детекциями
-            st.markdown("#### 🎬 Режим видео")
+            st.markdown("#### Режим видео")
 
             # Создаем колонки для кнопок и флагов
             col_buttons, col_flags = st.columns([2, 1])
 
             with col_buttons:
                 # Кнопка для создания видео с детекциями
-                if st.button("🎥 Создать видео с детекциями", use_container_width=True):
+                if st.button("Создать видео с детекциями", use_container_width=True):
                     with st.spinner("Создание видео... Это может занять некоторое время."):
                         # Создаем временный файл
                         temp_output = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
@@ -426,7 +426,7 @@ with col2:
                         status_text.empty()
 
                 # Кнопка для создания видео с OC-SORT
-                if st.button("🎥 Создать видео с OC-SORT", use_container_width=True):
+                if st.button("Создать видео с OC-SORT", use_container_width=True):
                     with st.spinner("Создание видео с трекером... Это может занять некоторое время."):
                         temp_output_tr = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                         output_path_tr = temp_output_tr.name
@@ -442,14 +442,25 @@ with col2:
                                 progress_bar_tr.progress(progress)
                                 status_text_tr.text(f"Обработка кадра {frame_idx}/{total_frames}")
 
+                        # Загружаем треки OC-SORT
+                        oc_sort_tracks_path = "assets/tracks/oc_sort_basketball_000.txt"
+                        oc_sort_tracks_data = _load_tracks(oc_sort_tracks_path) if os.path.exists(
+                            oc_sort_tracks_path) else {"tracks": []}
+
+                        # Загружаем данные обуви специально для OC-SORT, если опция включена
+                        oc_sort_shoe_data = None
+                        if st.session_state.get("include_shoes_in_tracker_video", False):
+                            shoe_path = SHOE_LABELS_MAP.get("oc_sort")
+                            if shoe_path and os.path.exists(shoe_path):
+                                oc_sort_shoe_data = _load_shoes(shoe_path)
 
                         success_tr = create_video_with_tracks(
                             video_file_path,
-                            tracks_data,
+                            oc_sort_tracks_data,
                             output_path_tr,
                             progress_callback=progress_callback_tr,
-                            shoe_data=shoes_data if st.session_state.get("include_shoes_in_tracker_video",
-                                                                         False) else None,
+                            shoe_data=oc_sort_shoe_data,
+                            include_roi_zones=st.session_state.get("include_roi_zones", True),
                         )
 
                         if success_tr:
@@ -472,7 +483,7 @@ with col2:
                         status_text_tr.empty()
 
                 # Кнопка для создания видео с BoT-SORT
-                if st.button("🎥 Создать видео с BoT-SORT", use_container_width=True):
+                if st.button("Создать видео с BoT-SORT", use_container_width=True):
                     with st.spinner("Создание видео с BoT-SORT... Это может занять некоторое время."):
                         temp_output_bot = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                         output_path_bot = temp_output_bot.name
@@ -493,14 +504,20 @@ with col2:
                         bot_sort_tracks_path = "assets/tracks/bot_sort_reid_basketball_000.txt"
                         bot_sort_tracks_data = _load_tracks(bot_sort_tracks_path) if os.path.exists(
                             bot_sort_tracks_path) else {"tracks": []}
+                        # Загружаем данные обуви специально для BoT-SORT, если опция включена
+                        bot_sort_shoe_data = None
+                        if st.session_state.get("include_shoes_in_tracker_video", False):
+                            shoe_path = SHOE_LABELS_MAP.get("bot_sort_reid")
+                            if shoe_path and os.path.exists(shoe_path):
+                                bot_sort_shoe_data = _load_shoes(shoe_path)
 
                         success_bot = create_video_with_tracks(
                             video_file_path,
                             bot_sort_tracks_data,
                             output_path_bot,
                             progress_callback=progress_callback_bot,
-                            shoe_data=shoes_data if st.session_state.get("include_shoes_in_tracker_video",
-                                                                         False) else None,
+                            shoe_data=bot_sort_shoe_data,
+                            include_roi_zones=st.session_state.get("include_roi_zones", True),
                         )
 
                         if success_bot:
@@ -925,23 +942,3 @@ with col3:
         st.error(f"Ошибка при построении диаграммы: {str(e)}")
 
     st.markdown("</div>", unsafe_allow_html=True)
-
-    # Font by Liver
-    st.markdown(
-        "<div style='text-align: right; color: #6c757d; font-size: 0.75rem; margin-top: 0.5rem;'>Font by Liver</div>",
-        unsafe_allow_html=True)
-
-    # Процентные показатели
-    perc_cols = st.columns(2)
-    with perc_cols[0]:
-        st.markdown("""
-            <div class='metric-card' style='text-align: center;'>
-                <div class='stat-value' style='color: #6c757d;'>201%</div>
-            </div>
-        """, unsafe_allow_html=True)
-    with perc_cols[1]:
-        st.markdown("""
-            <div class='metric-card' style='text-align: center;'>
-                <div class='stat-value' style='color: #28a745;'>94%</div>
-            </div>
-        """, unsafe_allow_html=True)
