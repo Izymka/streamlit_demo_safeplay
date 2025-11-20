@@ -2,6 +2,8 @@ import os
 from typing import Dict, Any, List, Tuple
 import json
 import numpy as np
+from .text_utils import draw_text, text_size
+
 
 
 def load_shoe_labels(json_path: str) -> Dict[str, Any]:
@@ -10,7 +12,7 @@ def load_shoe_labels(json_path: str) -> Dict[str, Any]:
     The expected format is a dict mapping tracker_id strings to records like:
         {
           "1": {
-            "class": "Sneakers",
+            "class": "кроссовки",
             "confidence": 0.659,
             "frame": 1313,
             "area": 3650.5,
@@ -151,27 +153,20 @@ def summarize_all_shoes(data: Dict[str, Any]) -> Tuple[Dict[str, int], Dict[str,
     return counts, avg_conf
 
 
-def draw_shoes_summary_on_image(image_bgr, counts: Dict[str, int], avg_conf: Dict[str, float]):
-    """
-    Draw a compact legend with shoe classes, counts and avg confidence on the image.
-    Returns a new image (BGR). If cv2 is not available, returns input image.
-    """
-    try:
-        import cv2
-    except Exception:
-        return image_bgr
+def draw_shoes_summary_on_image(image_bgr, counts, avg_conf):
+    import cv2
+    from .text_utils import draw_text, text_size
 
     if image_bgr is None:
         return None
 
     out = image_bgr.copy()
 
-    # Prepare text lines
-    lines: List[str] = []
-    classes = sorted(counts.keys())
-    for cls in classes:
-        cnt = counts.get(cls, 0)
-        conf = avg_conf.get(cls, None)
+    # Prepare lines
+    lines = []
+    for cls in sorted(counts.keys()):
+        cnt = counts[cls]
+        conf = avg_conf.get(cls)
         if conf is not None:
             lines.append(f"{cls}: {cnt} (avg {conf:.2f})")
         else:
@@ -180,35 +175,36 @@ def draw_shoes_summary_on_image(image_bgr, counts: Dict[str, int], avg_conf: Dic
     if not lines:
         return out
 
-    # Visual params
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    scale = 0.6
-    thickness = 1
     pad = 8
-    line_gap = 6
+    gap = 6
 
-    # Compute box size
-    text_sizes = [cv2.getTextSize(t, font, scale, thickness)[0] for t in lines]
-    box_w = max(w for (w, h) in text_sizes) + 2 * pad
-    box_h = sum(h for (w, h) in text_sizes) + (len(lines) - 1) * line_gap + 2 * pad
+    # Заголовок
+    title = "Обувь"   # теперь можно писать по-русски
+    title_w, title_h = text_size(title, font_height=24)
 
-    x1, y1 = 10, 10  # top-left
+    # Размеры блока
+    text_sizes = [text_size(t, font_height=20) for t in lines]
+    body_h = sum(h for _, h in text_sizes) + (len(lines)-1)*gap
+    body_w = max(w for w,_ in text_sizes)
+
+    box_w = max(title_w, body_w) + pad*2
+    box_h = title_h + 10 + body_h + pad*2
+
+    x1, y1 = 10, 10
     x2, y2 = x1 + box_w, y1 + box_h
 
-    # Background rectangle (semi-transparent dark)
     overlay = out.copy()
-    cv2.rectangle(overlay, (x1, y1), (x2, y2), (40, 40, 40), thickness=-1)
+    cv2.rectangle(overlay, (x1, y1), (x2, y2), (40,40,40), -1)
     cv2.addWeighted(overlay, 0.35, out, 0.65, 0, out)
 
-    # Title
-    title = "Shoes"
-    (tw, th), base = cv2.getTextSize(title, font, 0.7, 2)
-    cv2.putText(out, title, (x1 + pad, y1 + pad + th), font, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+    # Draw title
+    draw_text(out, title, (x1 + pad, y1 + pad + title_h), font_height=24)
 
-    # Items
-    cur_y = y1 + pad + th + 10
-    for t, (w, h) in zip(lines, text_sizes):
-        cv2.putText(out, t, (x1 + pad, cur_y + h), font, scale, (230, 230, 230), 2, cv2.LINE_AA)
-        cur_y += h + line_gap
+    # Draw items
+    cur_y = y1 + pad + title_h + 10
+    for t in lines:
+        w, h = text_size(t, font_height=20)
+        draw_text(out, t, (x1 + pad, cur_y + h), font_height=20)
+        cur_y += h + gap
 
     return out

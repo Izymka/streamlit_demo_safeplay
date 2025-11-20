@@ -1,6 +1,6 @@
 {
   "1": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.659,
     "frame": 1313,
     "area": 3650.5,
@@ -43,7 +43,7 @@
     "max_area": 869.8025335151099
   },
   "9": {
-    "class": "non-athletic shoes",
+    "class": "неспортивная обувь",
     "confidence": 0.694,
     "frame": 823,
     "area": 5570.2,
@@ -86,7 +86,7 @@
     "max_area": 641.7473354651011
   },
   "22": {
-    "class": "pool shoes",
+    "class": "шлепки",
     "confidence": 0.806,
     "frame": 420,
     "area": 3869.2,
@@ -123,14 +123,14 @@
     "max_area": 1046.265146220794
   },
   "30": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.827,
     "frame": 434,
     "area": 3657.7,
     "crop_size": "64x64"
   },
   "32": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.673,
     "frame": 396,
     "area": 3973.3,
@@ -155,7 +155,7 @@
     "max_area": 1077.358781355087
   },
   "39": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.929,
     "frame": 625,
     "area": 3609.4,
@@ -168,7 +168,7 @@
     "max_area": 3064.13662092552
   },
   "45": {
-    "class": "bare feet",
+    "class": "босиком",
     "confidence": 0.847,
     "frame": 566,
     "area": 4039.4,
@@ -187,21 +187,21 @@
     "max_area": 1661.287631085888
   },
   "52": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.821,
     "frame": 818,
     "area": 3664.0,
     "crop_size": "64x64"
   },
   "54": {
-    "class": "pool shoes",
+    "class": "шлепки",
     "confidence": 0.433,
     "frame": 745,
     "area": 3616.5,
     "crop_size": "64x64"
   },
   "55": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.38,
     "frame": 620,
     "area": 3775.1,
@@ -214,7 +214,7 @@
     "max_area": 2490.3136688381
   },
   "60": {
-    "class": "non-athletic shoes",
+    "class": "неспортивная обувь",
     "confidence": 0.517,
     "frame": 954,
     "area": 3694.2,
@@ -227,7 +227,7 @@
     "max_area": 3033.1157928612897
   },
   "68": {
-    "class": "non-athletic shoes",
+    "class": "неспортивная обувь",
     "confidence": 0.475,
     "frame": 679,
     "area": 3767.1,
@@ -240,14 +240,14 @@
     "max_area": 1245.808873384896
   },
   "73": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.874,
     "frame": 989,
     "area": 4064.4,
     "crop_size": "64x64"
   },
   "76": {
-    "class": "non-athletic shoes",
+    "class": "неспортивная обувь",
     "confidence": 0.617,
     "frame": 803,
     "area": 3618.6,
@@ -266,7 +266,7 @@
     "max_area": 2013.2951086388282
   },
   "83": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.833,
     "frame": 967,
     "area": 3609.0,
@@ -279,7 +279,7 @@
     "max_area": 3535.0235676747875
   },
   "87": {
-    "class": "bare feet",
+    "class": "босиком",
     "confidence": 0.829,
     "frame": 908,
     "area": 3633.7,
@@ -316,7 +316,7 @@
     "max_area": 2007.6107688085242
   },
   "106": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.907,
     "frame": 1230,
     "area": 3800.0,
@@ -353,14 +353,14 @@
     "max_area": 3315.3500414261994
   },
   "125": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.486,
     "frame": 1307,
     "area": 3770.5,
     "crop_size": "64x64"
   },
   "126": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.405,
     "frame": 1334,
     "area": 4203.7,
@@ -373,7 +373,7 @@
     "max_area": 1783.52822821449
   },
   "128": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.653,
     "frame": 1339,
     "area": 3641.7,
@@ -392,7 +392,7 @@
     "max_area": 989.5216607496319
   },
   "133": {
-    "class": "bare feet",
+    "class": "босиком",
     "confidence": 0.508,
     "frame": 1454,
     "area": 3690.5,
@@ -411,7 +411,7 @@
     "max_area": 2127.3270932703
   },
   "136": {
-    "class": "pool shoes",
+    "class": "шлепки",
     "confidence": 0.502,
     "frame": 1761,
     "area": 3684.6,
@@ -436,7 +436,7 @@
     "max_area": 870.718513838182
   },
   "144": {
-    "class": "Sneakers",
+    "class": "кроссовки",
     "confidence": 0.735,
     "frame": 1962,
     "area": 4151.2,

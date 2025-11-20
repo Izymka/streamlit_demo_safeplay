@@ -133,17 +133,6 @@ def draw_tracks_on_image(
     """
     Draw track bboxes with consistent pleasant colors and ID labels above the box.
     If frame_shoes is provided, draw shoe type below bbox for each tracker.
-
-    Each item in `tracks` must have keys: id, bbox{x1,y1,x2,y2}
-
-    Args:
-        image_bgr: Input image (BGR)
-        tracks: List of track dicts for the current frame
-        track_history: Optional mapping track_id -> deque/list of (x, y) points for the trail
-        frame_shoes: Optional dict mapping tracker_id -> shoe info: {tracker_id: {"class": str, "confidence": float}}
-        smooth_trail: If True, applies Chaikin smoothing to trails for a smoother look
-        smooth_iters: Number of Chaikin iterations (2–3 is usually enough)
-        trail_thickness: Thickness of trail line
     """
     if image_bgr is None:
         return None
@@ -151,6 +140,17 @@ def draw_tracks_on_image(
         import cv2
     except Exception:
         return image_bgr
+
+    # use text_utils for unicode (Cyrillic) rendering
+    try:
+        from .text_utils import draw_text, text_size
+    except Exception:
+        # fallback to cv2.putText if text_utils not available
+        def draw_text(img, text, org, font_height=20, color=(255,255,255), thickness=1):
+            cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, font_height / 30.0, color, thickness, cv2.LINE_AA)
+        def text_size(text, font_height=20):
+            (w, h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_height / 30.0, 1)
+            return w, h
 
     out = image_bgr.copy()
     if frame_shoes is None:
@@ -173,8 +173,14 @@ def draw_tracks_on_image(
 
         # Label 'ID {id}' above the bbox
         label = f"ID {tid}" if tid is not None else "ID ?"
-        (tw, th), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)
-        th_tot = th + baseline
+        try:
+            tw, th = text_size(label, font_height=22)
+        except Exception:
+            # fallback
+            (tw, th), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)
+            tw = int(tw); th = int(th)
+        baseline_approx = 4
+        th_tot = th + baseline_approx
         pad = 4
         # background box above top-left corner
         x_bg1 = x1
@@ -187,9 +193,13 @@ def draw_tracks_on_image(
         cv2.rectangle(overlay, (x_bg1, y_bg1), (x_bg2, y_bg2), color, thickness=-1)
         cv2.addWeighted(overlay, 0.25, out, 0.75, 0, out)
 
-        # text on top
+        # text on top (org is bottom-left of text)
         txt_org = (x_bg1 + pad, y_bg2 - pad)
-        cv2.putText(out, label, txt_org, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (220, 20, 60), 2, cv2.LINE_AA)
+        try:
+            draw_text(out, label, txt_org, font_height=22, color=(220, 20, 60), thickness=2)
+        except Exception:
+            # final fallback to cv2.putText if draw_text fails
+            cv2.putText(out, label, txt_org, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (220, 20, 60), 2, cv2.LINE_AA)
 
         # Draw shoe type below bbox if available
         if tid is not None and tid in frame_shoes:
@@ -198,7 +208,11 @@ def draw_tracks_on_image(
             confidence = shoe_info.get("confidence", 0.0)
             shoe_text = f"{shoe_class} ({confidence:.2f})"
 
-            (shoe_width, shoe_height), baseline = cv2.getTextSize(shoe_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            try:
+                shoe_width, shoe_height = text_size(shoe_text, font_height=18)
+            except Exception:
+                (shoe_width, shoe_height), baseline = cv2.getTextSize(shoe_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+                shoe_width = int(shoe_width); shoe_height = int(shoe_height)
 
             # Shoe text background (below bbox)
             shoe_bg_y1 = y2 + 2
@@ -207,18 +221,23 @@ def draw_tracks_on_image(
             shoe_bg_x2 = shoe_bg_x1 + shoe_width + 4
 
             # Adjust if goes off right edge of image
-            if shoe_bg_x2 > out.shape[1]:
-                shoe_bg_x1 = out.shape[1] - shoe_width - 4
-                shoe_bg_x2 = out.shape[1]
+            img_w = out.shape[1]
+            if shoe_bg_x2 > img_w:
+                shoe_bg_x1 = max(0, img_w - shoe_width - 4)
+                shoe_bg_x2 = img_w
 
             # Draw semi-transparent background for shoe text
             shoe_overlay = out.copy()
             cv2.rectangle(shoe_overlay, (shoe_bg_x1, shoe_bg_y1), (shoe_bg_x2, shoe_bg_y2), (0, 0, 0), -1)
             cv2.addWeighted(shoe_overlay, 0.6, out, 0.4, 0, out)
 
-            # Draw shoe text
-            cv2.putText(out, shoe_text, (shoe_bg_x1 + 2, shoe_bg_y1 + shoe_height + 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+            # Draw shoe text (org is bottom-left)
+            txt_x = shoe_bg_x1 + 2
+            txt_y = shoe_bg_y1 + shoe_height + 2
+            try:
+                draw_text(out, shoe_text, (txt_x, txt_y), font_height=18, color=(255, 255, 255), thickness=1)
+            except Exception:
+                cv2.putText(out, shoe_text, (txt_x, txt_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
     # ----- DRAW TRAILS -----
     if track_history is not None:
