@@ -129,21 +129,10 @@ if 'min_confidence' not in st.session_state:
     st.session_state.min_confidence = 0.0
 if 'video_mode' not in st.session_state:
     st.session_state.video_mode = False
-# Инициализация состояний для чекбоксов
-if 'yolo_enabled' not in st.session_state:
-    st.session_state.yolo_enabled = True
-if 'track_id' not in st.session_state:
-    st.session_state.track_id = False
-if 'bot_sort_reid' not in st.session_state:
-    st.session_state.bot_sort_reid = False
-if 'shoe1' not in st.session_state:
-    st.session_state.shoe1 = True
-if 'floor' not in st.session_state:
-    st.session_state.floor = False
-if 'window' not in st.session_state:
-    st.session_state.window = False
+
 if 'selected_video' not in st.session_state:
     st.session_state.selected_video = "Исходное видео"
+
 # Настройка страницы
 st.set_page_config(
     page_title="Safe Play",
@@ -209,7 +198,7 @@ with col1:
 
     yolo_enabled = st.checkbox(
         "Детекции YOLO",
-        value=st.session_state.yolo_enabled,
+        value=True,
         key="yolo_enabled",
         on_change=handle_other_checkboxes_change
     )
@@ -246,7 +235,7 @@ with col1:
 
     shoe_classification_1 = st.checkbox(
         "Классификация обуви",
-        value=st.session_state.shoe1,
+        value=True,
         key="shoe1",
         on_change=handle_other_checkboxes_change,
         disabled=(active_tracker_key is None)  # ❗ работает только при включенном трекере
@@ -271,7 +260,7 @@ with col1:
 
     floor = st.checkbox(
         "Пол",
-        value=st.session_state.floor,
+        value=False,
         key="floor",
         on_change=handle_other_checkboxes_change
     )
@@ -280,7 +269,7 @@ with col1:
 
     window = st.checkbox(
         "Окна",
-        value=st.session_state.window,
+        value=False,
         key="window",
         on_change=handle_other_checkboxes_change
     )
@@ -591,14 +580,14 @@ with col2:
                 # Флаг: включать ли обувь в видео трекера
                 include_shoes_in_tracker_video = st.checkbox(
                     "👟 Включить обувь",
-                    value=st.session_state.get("include_shoes_in_tracker_video", False),
+                    value=False,
                     key="include_shoes_in_tracker_video"
                 )
 
                 # Флаг: включать ли ROI зоны
                 include_roi_zones = st.checkbox(
                     "📐 Включить ROI зоны",
-                    value=st.session_state.get("include_roi_zones", False),
+                    value=False,
                     key="include_roi_zones"
                 )
         else:
